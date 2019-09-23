@@ -1,0 +1,54 @@
+##########################################################
+#
+# Ruby-Wake
+#
+# Supports Ruby environments through the "gem" and "bundler" mechanisms
+#
+# To support distinct environments, the .gem directory is located in the
+#   same directory as Gemfile. It is installed automatically by wake,
+#   but the installation can be performed ahead of time by other tools (e.g. wit).
+#
+# TODO: create a wrapper in .gem/.bin which points to the correct version of Ruby.
+#
+############################################################
+
+
+##########################################################
+# Add a ruby environment to the plan
+##########################################################
+global def addRubyEnv gemDir plan =
+
+    # Install the ruby environment if not already done
+    def outputs = installRubyEnv gemDir
+
+    # Add the binary directory to PATH.
+    plan
+    | addPlanPath "PATH" "{workspace}/{gemDir}/.gem/bin"
+    | addPlanPath "GEM_PATH"  "{workspace}/{gemDir}/.gem"
+    | editPlanVisible (outputs ++ _)
+
+
+##############################################################################
+# Install the bundler environment. Return .gem directory on success.
+#   The .gem will reside in the same directory as the Gemfile
+################################################################################
+global def installRubyEnv gemDir =
+    manualEnv
+    | setPlanVisible ( (source "{gemDir}/Gemfile"), (source "{gemDir}/Gemfile.lock"), Nil)
+    | setPlanOutputs ( "{gemDir}/.gem", Nil )
+    | setPlanDirectory gemDir
+    | editPlanResources ("ruby/ruby/2.5.1", _)
+    | runCommand ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
+    | getJobOutputs
+
+
+##############################################################################
+# Test installed Ruby environment.
+#  TODO: Create a standalone test which does not depend on Docgven
+################################################################################
+global def testRuby _ =
+    systemPlan
+    | addRubyEnv "{docgenDir}"
+    | runCommand ("asciidoctor", "--version", Nil)
+    | getJobStdout
+

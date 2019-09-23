@@ -1,0 +1,205 @@
+################################################################
+#
+# A set of generic Wake functions for running system commands.
+#
+# One goal is to run any command from wake as though it were run from the user's shell.
+#   Since a "command" may be a shell script, it is necessary to pass the user's full environment to it
+#   or the underlying commands can and will fail.
+#   A second goal is to support utilities like pipenv, ruby bundler and npm directly from Wake.
+#   These utilities add additional paths and environmental variables to the user's environment.
+#   We include additional functions to make these updates easy.
+#
+# Note we are not currently able to pass the full environment, but we pass enough to work for docgen.
+#
+# Normally, Wake creates a command first and then fills in the environment variables and other details.
+#   This order can be a bit awkward:
+#      - We may be building up a PATH, and we want the command to be based on the new PATH.
+#      - We want to reuse the same type of job and environment for multiple commands.
+#
+# These functions repackage the Wake functions. They work backwards from Wake -
+#   they set up the details, then they declare and run the commmand as a last step.
+#   It is mostly a change of perspective. What Wake calls a "plan", we think of as a "runtime environment".
+#   From our perspective, we are setting up an environment, and then we run one or more commands using that environment.
+#   This does not represent any changes to wake data structures, just a slightly different way of thinking.
+#
+# We declare several runtime environments to start with:
+#    basicEnv - the default Wake runtime environment, pretty minimal.
+#    systemPlan - a basic "fuse" runtime environment which includes the previously setup environment variables.
+#    manualEnv - a non-fuse runtime environment including the environment variables.
+#
+# Finally, we declare a function for running a job.
+#    manualEnv | runCommand ("echo", "Hello World!", nil)
+#
+# The handling of wake's "path" publish/subscribe topic is a bit awkward.
+#   Generally, we want these paths to go in front of the regular PATH.
+#   Unfortunately, wake's "path" contains "/usr/bin" and "/bin".  If we put those in front,
+#   we no longer get the correct version of python, and commands versioned with "module"
+#   revert to their system defaults.  As a compromise, we add "path" after PATH.
+#
+# Several commands, pipenv and the ruby bundler included, require some sort of HOME directory.
+#   They can be placated by providing any temporary directory as HOME.  (for example, /tmp)
+#   We probably should create a unique temp directory, but then we would also be responsible for removing it.
+#
+##################################################################################################
+
+
+
+
+#####################################################################
+# Create an environment for running a system command.
+#  The environment includes the user's environment variables.
+#########################################################################
+global def systemPlan =
+  basicEnv
+  | setPlanSystemEnvironment
+
+###########################
+# Minimal environment.
+##########################
+global def basicEnv =
+   makePlan ("echo", "No Command Given", Nil) Nil
+
+
+###################################################
+# A non-Fuse environment for running system commands
+####################################################
+global def manualEnv =
+    systemPlan
+    | setPlanLocalOnly True
+
+
+
+################################################
+# Given an environment, Run the Command.
+#  Typically, will be followed by "getJobOutputs" or "getJobStdout".
+###################################################
+global def runCommand cmdLine plan =
+
+  # Add the command to the plan.
+  def planWithCommand = match cmdLine
+    cmd, args = plan | setPlanCommand (cmd, args)
+    Nil = plan
+
+  # Run the command
+  planWithCommand | runJob
+
+
+def debugJob job =
+  def _ = "Debug Job" | debug ""
+  def _ = job.getJobDescription | debug "description"
+  def _ = job.getJobStatus | debug "status"
+  def _ = job.getJobOutputs | debug "outputs"
+  def _ = job.getJobFailedOutputs | debug "failed outputs"
+  def _ = job.getJobStdout | debug "stdout"
+  def _ = job.getJobInputs | debug "inputs"
+  job
+
+
+
+
+########################################################
+# Get the current environment. Our assumption (which is not correct)
+#  is the environment will be set up correctly before we start.
+# For now, just pass on a minimal environment needed to run common subcommands.
+#   - PATH so we find common commands ("which" uses current PATH, subcommands do as well)
+#   - LANG and its ilk.  (needed by several standard Linux commands)
+#   - HOME  (requireed by several commands including Ruby bundler)ex
+######################################################################
+global def setPlanSystemEnvironment plan =
+  plan
+  | setPlanVar "PATH" (getenv "PATH" | getOrElse "/usr/local/bin:/usr/bin:/bin")   # Temporary - debugging
+  | setPlanVar  "WORKSPACE"  workspace
+  | setPlanVar "LANG" (getenv "LANG" | getOrElse "en_US.UTF8")
+  | setPlanVar "LC_ALL" (getenv "LC_ALL" | getOrElse "en_US.UTF-8")
+  | setPlanVar "HOME"  (getenv "HOME" | getOrElse "/tmp")  # Need a HOME - any valid temp directory will do.
+
+
+#############################################################################
+# Get or Set an environment variable in a plan. TODO: Should we return option?
+#############################################################################
+global def getPlanVar key plan = plan.getPlanEnvironment | getEnvironment key
+
+global def setPlanVar key value plan =
+  plan.getPlanEnvironment | setEnvironment key value | (setPlanEnvironment _ plan)
+
+
+
+#############################################################
+# Get, Set, Edit a PATH type environment variable in a plan
+# TODO: If variable doesn't exist, we shouldn't create an empty variable
+###############################################################
+global def getPlanPath name plan = match (getPlanVar name plan)
+  Some path = path | tokenize `:`
+  None = Nil
+
+global def setPlanPath name path plan =
+    setPlanVar name (catWith ":" path) plan
+
+global def editPlanPath key fn plan =
+    def oldPath = getPlanPath key plan
+    def newPath = fn oldPath
+    setPlanPath key newPath plan
+
+##################################################################
+# Modify a PATH to be relative to a new Plan directory.
+#   Used after the Plan declares it runs in its own directory instead of the workspace.
+#   Note: assumes we would otherwise be in the worskpace directory.
+#   We probably should both set the directory and remap in a single functionm,
+#   then all the info is available to map and remap, and we don't have to worry about which came first.
+########################################################################
+def remapPlanPath key plan =
+    def isAbsolute path = `/.*`.matches path
+    def dir = plan.getPlanDirectory | debug "Plan's Directory"
+    def remap path = if path.isAbsolute then path else (relative dir path)
+    editPlanPath key (map remap _) plan
+
+######################################
+# Like above, but pass a list of keys
+######################################
+global def remapPlanPaths keyList plan =
+    keyList | foldl (flip remapPlanPath) plan
+
+
+##################################################################
+# Add a directory path to a PATH type environment variable in a plan
+#################################################################
+global def addPlanPath key path plan = plan | editPlanPath key (path, _)
+
+
+
+
+############################################################
+# When setting paths to system or utility directories, we may want to use absolute paths.
+#############################################################
+global def absPath path = "{workspace}/{relative workspace path}"
+
+
+#####################################################################
+# Declare the list of output files we expect. (Others will be ignored)
+######################################################################
+global def setPlanOutputs fileList plan =
+  plan | setPlanFnOutputs (\_ fileList)
+
+global def ignoreBadPaths list =
+    def isGood path = path.getPathResult.isPass
+    list | filter isGood
+
+##############################################################
+# Fetch a "path" from a system environment variable. Returns list of strings.
+def getenvPath key = match (getenv key)
+   None = Nil
+   Some path = tokenize `:` path
+
+
+###########################################################
+# "debug"  - identity function which displays a value for debugging.
+#    Can be invoked as:    def _ = debug expression
+#                   or     def _ = expression | debug
+global def debug msg x =
+      def _ = "Debug:{msg} {format x}" | println
+      x
+
+
+# A quick "Hello World" test function.
+global def testHello _ =
+  manualEnv | runCommand  ("echo", "Hello World", Nil) | getJobStdout
