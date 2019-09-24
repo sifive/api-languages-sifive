@@ -8,84 +8,55 @@
 #   same directory as package.json.  It is installed automatically by wake,
 #   but the installation can be performed ahead of time by other tools (eg wit).
 #
-# "npmEnv packageFile" is a reasonable default plan for running Node.
-#       npmEnv here | runNode   arg1 arg2 ... argn
-#   should run a Javascript program under node.
-#
-# You can also add the npm to an existing environment.
-#    basicEnv
-#    | addNpmEnv "{here}/package.json"
-# adds node binaries to the runtime PATH.
-#
-# Currently, we only run node when it is installed in the system directories,
-#   and we don not support multiple versions of node. This situation could
-#   change if we supported node via the "module" or some other system.
-#
 ############################################################
 
 
 
-#####################################################################
-# Create a wake plan for running a generic node module.
-#   Use the virtual environment associated with package.json file.
-#####################################################################
-global def npmEnv packageDir =
-
-   # Add the npm packages to the default system environment.
-   systemPlan
-   | addNpmEnv packageDir
-
-
-
 #################################################################
-# Given an environment, Run a Javascript module under node in that environment.
-#################################################################npm
-global def runNode args plan =
-  runCommand ("node", args)  plan
-
+# Create a command for running a node module
+#################################################################
+global def nodeCommand module args  =
+    "node", "-e", "module", "--", args
 
 
 
 ##########################################################
 # Add an npm virtual environment to the plan
 ##########################################################
-global def addNpmEnv packageDir plan =
+global def addNodeEnv packageDir plan =
 
-    # Install the virtual environment if not already done
-    def outputs = installNpmEnv packageDir
+    # Install the npm virtual environment
+    def installed = installNodeEnv packageDir
 
-    # Add the directory to PATH and NODE_PATH
+    # Add the installed modules to PATH and NODE_PATH
     plan
-    | addPlanPath  "PATH" "{workspace}/{packageDir}/node_modules/.bin"
-    | addPlanPath  "NODE_PATH"  "{workspace}/{packageDir}/node_modules"
-    | editPlanVisible (outputs ++ _)
+    | addPlanPath  "PATH" "{workspace}/build/{packageDir}/node_modules/.bin"
+    | addPlanPath  "NODE_PATH"  "{workspace}/build/{packageDir}/node_modules"
+    | editPlanVisible (installed ++ _)
 
 
 
 ##############################################################################
-# Install the npm environment. Return .node_modules directory on success.
+# Install the npm environment.
 #   The .node_modules directory will reside in the same directory as the package file
 ################################################################################
-global def installNpmEnv packageDir =
+global def installNodeEnv packageDir =
+    # Copy the package files to the build directory
+    def bd = "build/{packageDir}"
+    def pkg = installIn bd (source "{packageDir}/package.json")
+    def lock = installIn bd (source "{packageDir}/package-lock.json")
 
-    # The virtual environment will be in same directory as the Pipfile
-    def packageFile = source "{packageDir}/package.json"
-    def packageLock = source "{packageDir}/package-lock.json"
-    def modulesDir = "{packageDir}/node_modules"
-
-    manualEnv
-    | setPlanVisible (packageFile, packageLock, Nil)
-    | setPlanOutputs (modulesDir, Nil)
-    | setPlanDirectory packageDir
-    | runCommand ("npm", "install", Nil)
+    # The virtual environment will be in the build directory with the new package files.
+    makeSystemPlan ("npm", "install", Nil)  (pkg, lock, Nil)
+    | planChdir bd Nil
+    | runJob
     | getJobOutputs
-
 
 
 global def testNode _ =
     def version =
-        systemPlan
-        | runCommand ( "node", "-v", Nil)
-        | getJobStdout
+        makeSystemPlan ("node", "-v", Nil)  Nil
+        | addNodeEnv "{here}/tests"
+        | runJob | getJobStdout
     version
 

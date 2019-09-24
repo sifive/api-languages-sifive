@@ -13,6 +13,16 @@
 ############################################################
 
 
+
+###########################################
+# Create a ruby command to run a gem with arguments
+#   An opportunity to add run time flags ...
+##################################################
+global def rubyCommand gem arglist =
+    "ruby", gem, arglist
+
+
+
 ##########################################################
 # Add a ruby environment to the plan
 ##########################################################
@@ -23,8 +33,8 @@ global def addRubyEnv gemDir plan =
 
     # Add the binary directory to PATH.
     plan
-    | addPlanPath "PATH" "{workspace}/{gemDir}/.gem/bin"
-    | addPlanPath "GEM_PATH"  "{workspace}/{gemDir}/.gem"
+    | addPlanPath "PATH" (absPath "{gemDir}/.gem/bin") # TODO: problem with fuse and links to system files
+    | addPlanPath "GEM_PATH"  (absPath "{gemDir}/.gem") # TODO: problem with fuse and links to system files
     | editPlanVisible (outputs ++ _)
 
 
@@ -33,12 +43,13 @@ global def addRubyEnv gemDir plan =
 #   The .gem will reside in the same directory as the Gemfile
 ################################################################################
 global def installRubyEnv gemDir =
-    manualEnv
-    | setPlanVisible ( (source "{gemDir}/Gemfile"), (source "{gemDir}/Gemfile.lock"), Nil)
-    | setPlanOutputs ( "{gemDir}/.gem", Nil )
-    | setPlanDirectory gemDir
+    def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
+
+    makeSystemPlan cmd ( (source "{gemDir}/Gemfile"), (source "{gemDir}/Gemfile.lock"), Nil)
+    | setPlanLocalOnly True  # TODO: problem with wake following links to system files.
+    | planChdir gemDir Nil
     | editPlanResources ("ruby/ruby/2.5.1", _)
-    | runCommand ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
+    | runJob
     | getJobOutputs
 
 
@@ -47,8 +58,9 @@ global def installRubyEnv gemDir =
 #  TODO: Create a standalone test which does not depend on Docgven
 ################################################################################
 global def testRuby _ =
-    systemPlan
+    makeSystemPlan ("asciidoctor", "--version", Nil) Nil
+    | setPlanLocalOnly True
     | addRubyEnv "{docgenDir}"
-    | runCommand ("asciidoctor", "--version", Nil)
+    | runJob
     | getJobStdout
 

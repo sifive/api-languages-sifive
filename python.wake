@@ -10,72 +10,86 @@
 #   but the installation can be performed ahead of time by other tools (eg wit).
 #
 # Note we only look at "Pipfile.lock".  This routine does NOT update or create "Pipfile.lock".
-#
 ############################################################
 
 
-#################################################################
-# Given a plan, Run a python module in that environment.
-# Python always adds the CWD to the path.
-#################################################################
-# TODO - Don't include CWD in sys.path. Under Wake, CWD is usually the workspace.
-global def runPython module args plan =
-  runCommand ("python3", "-m", module, args)  plan
 
+
+#######################################################################################
+# Create a python command line based on the module name. Adds cmd line options as needed.
+######################################################################################
+global def pythonCommand module args = ("python3", "-m", module, args)
+
+
+
+######################################################
+# Add a Python virtual environment to a plan.
+#   Currently only supports pipenv, but this is where would examine the directory
+#   to see if other env managers are being used.
+######################################################
+global def addPythonEnv = addPipenvEnv
+global def installPythonEnv = installPipenvEnv
 
 
 ##########################################################
-# Add a pip virtual environment to the plan
+# Add a pipenv virtual environment to the plan.
+#   TODO: Do to a possible wake bug, pipenv virtual environments might not map into fuse.
+#   TODO: Temporarily, run installation jobs locally and set absolute paths in PYTHONPATH.
 ##########################################################
-global def addPythonEnv pipDir plan =
+def addPipenvEnv pipDir plan =
 
     # Install the virtual environment if not already done
-    def installed = installPipEnv pipDir
+    def installed = installPipenvEnv pipDir
+    def venv = "build/{pipDir}/.venv"
 
     # Add the binary directory to PATH.
     plan
-    | addPlanPath  "PYTHONPATH"  (pipDir | debug "Adding to PYTHONPATH")
-    | addPlanPath  "PYTHONPATH"  "{workspace}/{pipDir}/.venv"
-    | addPlanPath  "PATH" "{workspace}/{pipDir}/.venv/bin"
-    | setPlanVar "PYTHONDONTWRITEBYTECODE"  "1"   # Avoid creating pycache
     | editPlanVisible (installed ++ _)
-
+    | addPlanPath  "PYTHONPATH"  (absPath venv) # TODO: remove absPath when Wake issue resolved.
+    | addPlanPath  "PATH" (absPath "{venv}/bin")  # TODO: remove absPath when Wake issue resolved.
 
 
 ##############################################################################
-# Install the pipenv environment associated with Pipfile.lock, returning .venv directory on success.
+# Install the pipenv environment associated with Pipfile.lock.
 #   The .venv will reside in the same directory as the Pipfile.lock.
 #   We do NOT look at Pipfile, nor do we update Pipfile.lock. We simply create a reproducible set of packages.
-#
-# We assume the Pipfile is at the top of a Python module, thus we add the directory to the PYTHONPATH.
+# TODO: install elsewhere, say in a "build" directory.
 ################################################################################
-global def installPipEnv pipDir =
+global def installPipenvEnv pipDir =
 
-   # Step 1 - Use pip to install pipenv in .venv/bin
+   # Step 1 - Copy the pip files to the build directory
+   def pipFile = installIn "build" (source "{pipDir}/Pipfile")
+   def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Lock"
+
+   # Step 2 - Running from the build direcgory, use pip to install pipenv in .venv/bin
    #  TODO: Not sure why pipDir must be added to visibles (with fuse).
-   #  TODO: fuse fails with permission errors when following symbolic links to system directory.
+   #  TODO: fuse fails with permission errors when following symbolic links to system directory. Disable fuse for now.
    def pipOutputs =
-      manualEnv
-      | setPlanVisible (source pipDir, source "{pipDir}/Pipfile.lock", Nil)
+      makeSystemPlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
+      | setPlanLocalOnly True  # TODO: remove when Wake issue resolved.
+      | setPlanFnOutputs ("build/{pipDir}/.venv/bin/pipenv", _)  # TODO: remove when Wake issue resolved
       | setPlanResources ("python/python/3.7.1", Nil)
-      | setPlanDirectory pipDir
-      | setPlanOutputs ("{pipDir}/.venv", Nil) # Only for manual workaround - we need some output
-      | runCommand("pip3", "install", "--target=.venv", "pipenv", Nil)
-      | getJobOutputs
+      | planChdir "build/{pipDir}" Nil
+      | runJob
+      | getJobOutputs| debug "outputs"
 
-   # Step 2 - use pipenv and Pipfile.lock to install everything else in .venv
+   # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv
    #    We do NOT update Pipfile.lock, nor do we even look at Pipfile.
    #    For manual workaround, we need some output thingy ... but what?
    def pipenvOutputs =
-     manualEnv
-     | setPlanVisible pipOutputs
+     makeSystemPlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
+     | setPlanLocalOnly True  # TODO: remove when Wake issue resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
-     | setPlanDirectory pipDir
-     | runCommand (".venv/bin/pipenv",  "sync", "--dev", Nil)
+     | planChdir "build/{pipDir}" Nil
+     | runJob
      | getJobOutputs
 
    # Our return value is all of the files installed. (potential dependencies to downstream jobs)
    pipenvOutputs ++ pipOutputs
 
 
+global def testPython Unit =
+    makeSystemPlan ("python3", "-v", Nil) Nil
+    | addPythonEnv "{here}/tests"
+    | runJob | getJobStdout
