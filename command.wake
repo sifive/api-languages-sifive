@@ -1,27 +1,9 @@
 ################################################################
 #
-# A set of generic Wake functions for running system commands.
-#
-# Several commands, pipenv and the ruby bundler included, require some sort of HOME directory.
-#   They can be placated by providing any temporary directory as HOME.  (for example, /tmp)
-#   We probably should create a unique temp directory, but then we would also be responsible for removing it.
+# A set of generic functions for running system commands.
 #
 ##################################################################################################
 
-
-########################################################################################
-# Create a plan with defaults for running most system commands
-#   Basically, it is a regular default plan with additional variables
-#   required by common Linux commands or helpful to the wake environment.
-# TODO: verify these environment variables are still needed.  (Look at default wake plan.)
-#######################################################################################
-global def makeSystemPlan cmd visible =
-   makePlan cmd visible
-   | setPlanVar "PATH" (getenv "PATH" | getOrElse "/usr/local/bin:/usr/bin:/bin")   # Temporary debugging. use environment instead.
-   | setPlanVar  "WORKSPACE"  workspace  # A convenience for applications running under wake.
-   | setPlanVar "LANG"  "en_US.UTF8"
-   | setPlanVar "LC_ALL"  "en_US.UTF-8"
-   | setPlanVar "HOME"   "/tmp"  # Need a HOME - any valid temp directory will do.
 
 
 #######################################################################################################
@@ -85,7 +67,6 @@ global def editPlanPath key fn plan =
     setPlanPath key newPath plan
 
 
-
 #############################################################################
 # Get or Set an environment variable in a plan.
 #############################################################################
@@ -95,18 +76,30 @@ global def getPlanVar key plan =
 global def setPlanVar key value plan =
   plan.getPlanEnvironment | setEnvironment key value | (setPlanEnvironment _ plan)
 
+#######################################################
+# Pass if all the files are valid.  Fail if any are Bad
+######################################################
+global def verifyFiles files =
+    files | map getPathResult | findFail | quietResult
 
 
-############################################################
+############################################################################
+# If Pass, don't display the noisy results, but do show error message on Fail
+##########################################################################
+global def quietResult result =
+    result | rmap (\_ "")
+
+
+###################################################################################
 # When setting paths to system or utility directories, we may want to use absolute paths.
-#############################################################
-global def absPath path = "{workspace}/{relative workspace path}"
+#   DEPRECATED
+######################################################################################
+#global def absPath path = "{workspace}/{relative workspace path}"
 
 
 ###############################################################################
-# "debug"  - identity function which displays a string and value for debugging.
-#    Can be invoked as:    def _ = debug msg expression
-#                   or     expression | debug msg
+# "debug"  - identity function which displays a message and a value for debugging.
+#    Can be invoked as:   expression | debug msg
 ################################################################################
 global def debug msg x =
       def _ = "Debug:{msg} {format x}" | println
@@ -114,33 +107,56 @@ global def debug msg x =
 
 
 ##########################################################################
-# A facility to preinstall stuff
-#       publish preinstall = f1, .., fn, Nil
+# A facility to preinstall whatever is needed by a wake project.
+#       publish preinstall = installFunction, Nil
 #
-# Where f1 ... fn are functions Unit-->Result to execute during preinstallation,
-#   The idea is each project which needs pre-installation publishes it's installation function.
-#   All the functions run during startup (eg from wit) so everything is installed ahead of time.
+# The "preinstall" function will will evaluate each of the installFunctions,
+# presumably when the workspace is being set up.
+#
+# Note each installFunction has type   Unit --> Result.
+#   Defensive programming would suggest the install functions should be:
+#     1) optional - the project should functon even if they are not evaluated, and
+#     2) idempotent - no harm if they are evaluated more than once.
+#   (These are suggestions, not requirements.)
 ############################################################################
 global def preinstall Unit =
 
-    # Run all the pre-installation functions.
+    # Run all the pre-installation functions. Each returns Result.
     def results = (subscribe preinstall) | map (_ Unit)
 
-    # Succeed silently and fail noisily if any of them fail.
+    # Pass silently if all of them were successful. Otherwise, Fail.
     findFail results | rmap (\_ "")
+
+
 
 
 # A quick hello world test function
 def testHello _ =
-  makeSystemPlan  ("echo", "Hello World", Nil)  Nil
+  makePlan  ("echo", "Hello World", Nil)  Nil
   | runJob
   | getJobStdout
 
 
 # A quick remapping test of environment variables.
 def testRemap _ =
-    makeSystemPlan ("sh", "-c", "/bin/echo -n $HERE", Nil)  (sources here `.*`)
+    makePlan ("sh", "-c", "/bin/echo -n $HERE", Nil)  (sources here `.*`)
     | setPlanPath "HERE"  (".", Nil)
     | planChdir "{here}" ("HERE", Nil)
     | runJob
     | getJobStdout  # Should get "../.."
+
+
+########################################################################################
+# Create a plan with defaults for running most system commands
+#   Basically, it is a regular default plan with additional variables
+#   required by common Linux commands or helpful to the wake environment.
+# DEPRECATED.
+#######################################################################################
+global def makeSystemPlan cmd visible =
+   makePlan cmd visible
+   | setPlanVar "PATH" (getenv "PATH" | getOrElse "/usr/local/bin:/usr/bin:/bin")   # Temporary debugging. use environment instead.
+   | setPlanVar  "WORKSPACE"  workspace  # A convenience for applications running under wake.
+   | setPlanVar "LANG"  "en_US.UTF8"
+   | setPlanVar "LC_ALL"  "en_US.UTF-8"
+   | setPlanVar "HOME"   "/tmp"  # Need a HOME - any valid temp directory will do.
+

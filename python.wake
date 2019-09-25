@@ -1,25 +1,19 @@
-##########################################################
+############################################################################
 #
 # Python-Wake
 #
-# Supports Python virtual environments through the "pipenv" mechanism,
-#   and provides a simplified "runPython" function to invoke a python module.
+# Supports multiple Python virtual environments through the "pipenv" mechanism.
+#   Each environment corresponds to a directory containing a Pipfile.
 #
-# To support distinct environments, the .venv directory is located in the
-#   same directory as Pipfile. It is installed automatically by wake,
-#   but the installation can be performed ahead of time by other tools (eg wit).
+# To use the python a virtual environment, add it to the command's plan
+#     makePlan  cmd  visible
+#     | addPythonEnv  "directory containing Pipfile"
+#     | runJob
 #
-# Note we only look at "Pipfile.lock".  This routine does NOT update or create "Pipfile.lock".
-############################################################
-
-# README. Encountered problems using Fuse with pipenv. While not fully diagnosed,
-#   pipenv creates symbol
-
-
-#######################################################################################
-# Create a python command line based on the module name. Adds cmd line options as needed.
-######################################################################################
-global def pythonCommand module args = ("python3", "-m", module, args)
+# If you wish to have the python modules downloaded by tne "preinstall" function.
+#      publish preinstall = (pythonInstaller "directory-containing-Pipfile"), Nil
+#
+#############################################################################
 
 
 
@@ -27,15 +21,8 @@ global def pythonCommand module args = ("python3", "-m", module, args)
 # Add a Python virtual environment to a plan.
 #   Currently only supports pipenv, but this is where would examine the directory
 #   to see if other env managers are being used.
-######################################################
-global def addPythonEnv = addPipenvEnv
-global def installPythonEnv = installPipenvEnv
-
-
 ##########################################################
-# Add a pipenv virtual environment to the plan.
-##########################################################
-def addPipenvEnv pipDir plan =
+global def addPythonEnv pipDir plan =
 
     # Install the virtual environment if not already done
     def installed = installPipenvEnv pipDir
@@ -48,39 +35,69 @@ def addPipenvEnv pipDir plan =
     | addPlanPath  "PATH" "{venv}/bin"
 
 
-##############################################################################
-# Install the pipenv environment associated with Pipfile.lock.
-#   The .venv will reside in the same directory as the Pipfile.lock.
-#   We do NOT look at Pipfile, nor do we update Pipfile.lock. We simply create a reproducible set of packages..
-################################################################################
-global def installPipenvEnv pipDir =
+###########################################################################
+# Create an installer function which, when invoked, installs python virtual env.
+#    Note the extra "_" in the argument list
+##########################################################################
+global def pythonInstaller pipdir _ =
+  installPipenvEnv pipdir | verifyFiles
 
-   # Step 1 - Copy the Pipfile.lock to the build directory. Pipfile is just along for the ride.
+
+
+#######################################################################################
+# Create a python command line based on the module name. Adds cmd line options as needed.
+######################################################################################
+global def pythonCommand module args = ("python3", "-m", module, args)
+
+
+
+##############################################################################
+# Install the python environment associated with Pipfile.lock.
+#  Note we install pipenv first, then use pipenv to install the remaining modules.
+#     For the workaround, the first step returns one file, and the second step
+#     returns all the files except that one.
+#     Appended together, we have a complete set of files.
+################################################################################
+target installPipenvEnv pipDir =
+
+   # Where we will install the virtual environment.
+   def venv = "build/{pipDir}/.venv"
+
+   # Step 1 - Copy Pipfile.lock to the build directory. Pipfile is just along for the ride.
    def pipFile = installIn "build" (source "{pipDir}/Pipfile")
    def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Installing pipenv"
 
-   # Step 2 - Running from the build direcgory, use pip to install pipenv in .venv/bin
+   # Step 2 - Running from the build directory, use pip to install pipenv in .venv/bin
    def pipOutputs =
-      makeSystemPlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
+      makePlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
+      | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed.
+      | setPlanFnOutputs (venv, _)  # TODO: Remove when wake problem is fixed.
       | setPlanResources ("python/python/3.7.1", Nil)
       | setPlanDirectory "build/{pipDir}"
       | runJob
-      | getJobOutputs| debug "Install Pipenv outputs"
+      | getJobOutputs
 
    # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv.
    def pipenvOutputs =
-     makeSystemPlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
+     makePlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
+     | setPlanLocalOnly True       # TODO: remove when wake problem is resolved
+     | setPlanFnOutputs ( (remove venv (files venv `.*`)) ++ _) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
      | setPlanDirectory "build/{pipDir}"
      | runJob
      | getJobOutputs
 
-   # Our return value is all of the files installed. (potential dependencies to downstream jobs)
+   # Our return value is all of the files installed.
    pipenvOutputs ++ pipOutputs
 
 
-global def testPython Unit = # Why doesn't this work?
+global def testPython Unit =
     makeSystemPlan ("python3", "-v", Nil) Nil
     | addPythonEnv "{here}/tests"
     | runJob | getJobStdout
+
+
+# Remove a string from a list of strings.
+def remove string strings =
+    filter (_ !=~ string) strings
