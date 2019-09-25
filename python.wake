@@ -65,7 +65,7 @@ target installPipenvEnv pipDir =
 
    # Step 1 - Copy Pipfile.lock to the build directory. Pipfile is just along for the ride.
    def pipFile = installIn "build" (source "{pipDir}/Pipfile")
-   def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Installing pipenv"
+   def lock = installIn "build" (source "{pipDir}/Pipfile.lock")
 
    # Step 2 - Running from the build directory, use pip to install pipenv in .venv/bin
    def pipOutputs =

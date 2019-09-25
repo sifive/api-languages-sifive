@@ -53,7 +53,7 @@ global def nodeCommand module args  =
 # Install a Javascript virtual environment.
 #    The binaries and packages will reside in the "build" directory.
 ################################################################################
-def installNodeEnv packageDir =
+target installNodeEnv packageDir =
     # Copy the package files to the build directory
     def pkg = installIn "build" (source "{packageDir}/package.json")
     def lock = installIn "build" (source "{packageDir}/package-lock.json")
@@ -67,7 +67,7 @@ def installNodeEnv packageDir =
     | getJobOutputs
 
 
-global def testNode _ =
+def testNode _ =
     def version =
         makePlan ("node", "-v", Nil)  Nil
         | addNodeEnv "{here}/tests"
