@@ -33,8 +33,8 @@ global def addRubyEnv gemDir plan =
 
     # Add the binary directory to PATH.
     plan
-    | addPlanPath "PATH" (absPath "{gemDir}/.gem/bin") # TODO: problem with fuse and links to system files
-    | addPlanPath "GEM_PATH"  (absPath "{gemDir}/.gem") # TODO: problem with fuse and links to system files
+    | addPlanPath "PATH" "{gemDir}/.gem/bin"
+    | addPlanPath "GEM_PATH"  "{gemDir}/.gem"
     | editPlanVisible (outputs ++ _)
 
 
@@ -46,7 +46,6 @@ global def installRubyEnv gemDir =
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
 
     makeSystemPlan cmd ( (source "{gemDir}/Gemfile"), (source "{gemDir}/Gemfile.lock"), Nil)
-    | setPlanLocalOnly True  # TODO: problem with wake following links to system files.
     | planChdir gemDir Nil
     | editPlanResources ("ruby/ruby/2.5.1", _)
     | runJob
@@ -59,8 +58,7 @@ global def installRubyEnv gemDir =
 ################################################################################
 global def testRuby _ =
     makeSystemPlan ("asciidoctor", "--version", Nil) Nil
-    | setPlanLocalOnly True
-    | addRubyEnv "{docgenDir}"
+    | addRubyEnv "{here}/tests"
     | runJob
     | getJobStdout
 

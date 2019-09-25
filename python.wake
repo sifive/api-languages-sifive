@@ -12,7 +12,8 @@
 # Note we only look at "Pipfile.lock".  This routine does NOT update or create "Pipfile.lock".
 ############################################################
 
-
+# README. Encountered problems using Fuse with pipenv. While not fully diagnosed,
+#   pipenv creates symbol
 
 
 #######################################################################################
@@ -33,8 +34,6 @@ global def installPythonEnv = installPipenvEnv
 
 ##########################################################
 # Add a pipenv virtual environment to the plan.
-#   TODO: Do to a possible wake bug, pipenv virtual environments might not map into fuse.
-#   TODO: Temporarily, run installation jobs locally and set absolute paths in PYTHONPATH.
 ##########################################################
 def addPipenvEnv pipDir plan =
 
@@ -45,40 +44,32 @@ def addPipenvEnv pipDir plan =
     # Add the binary directory to PATH.
     plan
     | editPlanVisible (installed ++ _)
-    | addPlanPath  "PYTHONPATH"  (absPath venv) # TODO: remove absPath when Wake issue resolved.
-    | addPlanPath  "PATH" (absPath "{venv}/bin")  # TODO: remove absPath when Wake issue resolved.
+    | addPlanPath  "PYTHONPATH"  venv
+    | addPlanPath  "PATH" "{venv}/bin"
 
 
 ##############################################################################
 # Install the pipenv environment associated with Pipfile.lock.
 #   The .venv will reside in the same directory as the Pipfile.lock.
-#   We do NOT look at Pipfile, nor do we update Pipfile.lock. We simply create a reproducible set of packages.
-# TODO: install elsewhere, say in a "build" directory.
+#   We do NOT look at Pipfile, nor do we update Pipfile.lock. We simply create a reproducible set of packages..
 ################################################################################
 global def installPipenvEnv pipDir =
 
-   # Step 1 - Copy the pip files to the build directory
+   # Step 1 - Copy the Pipfile.lock to the build directory. Pipfile is just along for the ride.
    def pipFile = installIn "build" (source "{pipDir}/Pipfile")
    def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Lock"
 
    # Step 2 - Running from the build direcgory, use pip to install pipenv in .venv/bin
-   #  TODO: Not sure why pipDir must be added to visibles (with fuse).
-   #  TODO: fuse fails with permission errors when following symbolic links to system directory. Disable fuse for now.
    def pipOutputs =
       makeSystemPlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
-      | setPlanLocalOnly True  # TODO: remove when Wake issue resolved.
-      | setPlanFnOutputs ("build/{pipDir}/.venv/bin/pipenv", _)  # TODO: remove when Wake issue resolved
       | setPlanResources ("python/python/3.7.1", Nil)
-      | planChdir "build/{pipDir}" Nil
+      | planSetDirectory "build/{pipDir}"
       | runJob
       | getJobOutputs| debug "outputs"
 
-   # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv
-   #    We do NOT update Pipfile.lock, nor do we even look at Pipfile.
-   #    For manual workaround, we need some output thingy ... but what?
+   # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv.
    def pipenvOutputs =
      makeSystemPlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
-     | setPlanLocalOnly True  # TODO: remove when Wake issue resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
      | planChdir "build/{pipDir}" Nil
@@ -89,7 +80,7 @@ global def installPipenvEnv pipDir =
    pipenvOutputs ++ pipOutputs
 
 
-global def testPython Unit =
+global def testPython Unit = # Why doesn't this work?
     makeSystemPlan ("python3", "-v", Nil) Nil
     | addPythonEnv "{here}/tests"
     | runJob | getJobStdout
