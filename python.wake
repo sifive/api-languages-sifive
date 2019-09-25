@@ -57,22 +57,22 @@ global def installPipenvEnv pipDir =
 
    # Step 1 - Copy the Pipfile.lock to the build directory. Pipfile is just along for the ride.
    def pipFile = installIn "build" (source "{pipDir}/Pipfile")
-   def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Lock"
+   def lock = installIn "build" (source "{pipDir}/Pipfile.lock") | debug "Installing pipenv"
 
    # Step 2 - Running from the build direcgory, use pip to install pipenv in .venv/bin
    def pipOutputs =
       makeSystemPlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
       | setPlanResources ("python/python/3.7.1", Nil)
-      | planSetDirectory "build/{pipDir}"
+      | setPlanDirectory "build/{pipDir}"
       | runJob
-      | getJobOutputs| debug "outputs"
+      | getJobOutputs| debug "Install Pipenv outputs"
 
    # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv.
    def pipenvOutputs =
      makeSystemPlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
-     | planChdir "build/{pipDir}" Nil
+     | setPlanDirectory "build/{pipDir}"
      | runJob
      | getJobOutputs
 
