@@ -27,9 +27,9 @@ global def addNodeEnv packageDir plan =
 
     # Add the installed modules to PATH and NODE_PATH
     plan
-    | addPlanPath  "PATH" "build/{packageDir}/node_modules/.bin"
-    | addPlanPath  "NODE_PATH"  "build/{packageDir}/node_modules"
-    | editPlanVisible (installed ++ _)
+    | addPlanPath  "PATH" "{workspace}/build/{packageDir}/node_modules/.bin"
+    | addPlanPath  "NODE_PATH"  "{workspace}/build/{packageDir}/node_modules"
+    | editPlanVisible ( _ ++ installed )
 
 
 
@@ -61,7 +61,7 @@ target installNodeEnv packageDir =
     # The virtual environment will be in the build directory with the new package files.
     makePlan ("npm", "install", Nil)  (pkg, lock, Nil)
     | setPlanLocalOnly True   # Remove when wake issue resolved
-    | setPlanFnOutputs ((files "build/{packageDir}/node_modules" `.*`) ++ _) # remove when wake issue resolved
+    | setPlanFnOutputs (\_ files "build/{packageDir}/node_modules" `.*`) # remove when wake issue resolved
     | setPlanDirectory "build/{packageDir}"
     | runJob
     | getJobOutputs

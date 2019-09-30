@@ -71,7 +71,7 @@ target installPipenvEnv pipDir =
    def pipOutputs =
       makePlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
       | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed.
-      | setPlanFnOutputs (venv, _)  # TODO: Remove when wake problem is fixed.
+      | setPlanFnOutputs (\_ venv, Nil)  # TODO: Remove when wake problem is fixed.
       | setPlanResources ("python/python/3.7.1", Nil)
       | setPlanDirectory "build/{pipDir}"
       | runJob
@@ -81,7 +81,7 @@ target installPipenvEnv pipDir =
    def pipenvOutputs =
      makePlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
      | setPlanLocalOnly True       # TODO: remove when wake problem is resolved
-     | setPlanFnOutputs ( (remove venv (files venv `.*`)) ++ _) # TODO: remove when wake problem is resolved
+     | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
      | setPlanDirectory "build/{pipDir}"

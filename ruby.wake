@@ -63,7 +63,7 @@ target installRubyEnv gemDir =
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
     makeSystemPlan cmd (gemFile, lock, Nil)
     | setPlanLocalOnly True      # TODO: remove when wake issue resolved
-    | setPlanFnOutputs ((files "build/{gemDir}/.gem" `.*`) ++ _)  # TODO: remove when wake issue resolved.
+    | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
     | setPlanDirectory "build/{gemDir}"
     | editPlanResources ("ruby/ruby/2.5.1", _)
     | runJob
