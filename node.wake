@@ -19,16 +19,18 @@
 
 ##########################################################
 # Add an npm virtual environment to the plan
+# TODO: wake problem when PATH or NODE_PATH are relative rather than absolute.
+#    "write /Users/johnm/Desktop/projects/onboarding/.fuse/.i.92604: Input/output error"
 ##########################################################
 global def addNodeEnv packageDir plan =
 
     # Install the npm virtual environment
-    def installed = installNodeEnv packageDir | debug "addNodeEnv visibles"
+    def installed = installNodeEnv packageDir
 
     # Add the installed modules to PATH and NODE_PATH
     plan
-    | addPlanPath  "PATH" "{workspace}/build/{packageDir}/node_modules/.bin"
-    | addPlanPath  "NODE_PATH"  "{workspace}/build/{packageDir}/node_modules"
+    | addPlanPath  "PATH" "{workspace}/build/{packageDir}/node_modules/.bin"  # TODO
+    | addPlanPath  "NODE_PATH"  "{workspace}/build/{packageDir}/node_modules" # TODO
     | editPlanVisible ( _ ++ installed )
 
 
