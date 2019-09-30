@@ -23,7 +23,7 @@
 global def addNodeEnv packageDir plan =
 
     # Install the npm virtual environment
-    def installed = installNodeEnv packageDir
+    def installed = installNodeEnv packageDir | debug "addNodeEnv visibles"
 
     # Add the installed modules to PATH and NODE_PATH
     plan
