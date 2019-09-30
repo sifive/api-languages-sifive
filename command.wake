@@ -39,7 +39,7 @@ def remapPath path oldDirectory newDirectory =
     def isAbsolute path = `/.*`.matches path
     if path.isAbsolute
     then path
-    else simplify (relative newDirectory oldDirectory)
+    else simplify "{oldDirectory}/{path}" | relative newDirectory | debug "Remap {path} from {oldDirectory} to {newDirectory}"
 
 
 #############################################################
