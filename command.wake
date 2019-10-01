@@ -5,75 +5,38 @@
 ##################################################################################################
 
 
-
-#######################################################################################################
-# Change the working directory of a plan, rewriting environment variables to be relative to the new directory.
-#
-#   For example, given myplan with PTYHONPATH and PATH already set,
-#         myplan
-#         | planChdir  "otherdirectory" ("PYTHONPATH", "PATH", Nil)
-#
-#   creates a new plan which runs from otherdirectory with the proper relative paths.
-######################################################################################################
-global def planChdir newDirectory pathVariables plan =
-    plan | remapPlanPaths newDirectory pathVariables | setPlanDirectory newDirectory
-
-
-# remap multiple environment variables to a new directory.
-def remapPlanPaths newDirectory pathVariables plan =
-    def remap plan key = remapPlanPath key newDirectory plan
-    pathVariables | foldl remap plan
-
-
-# remap a single environment variable to a new directory
-def remapPlanPath key newDirectory plan =
-    plan | editPlanPath key (remapPathList plan.getPlanDirectory newDirectory _ )
-
-
-# Remap a list of file paths from an old directory to a new directory.
-def remapPathList oldDirectory newDirectory pathList =
-    pathList | map (remapPath _ oldDirectory newDirectory)
-
-# Remap a single file path from an old directory to a new directory
-def remapPath path oldDirectory newDirectory =
-    def isAbsolute path = `/.*`.matches path
-    if path.isAbsolute
-    then path
-    else simplify "{oldDirectory}/{path}" | relative newDirectory 
-
-
 #############################################################
 # Functions which manipulate PATH-like variables in a plan's environment
 #  "key" refers to the name of the environment variable  (eg. PATH or PYTHONPATH)
 ###############################################################
 
 # Add a file path to the plan's environment variable
-global def addPlanPath key path plan = plan | editPlanPath key (path, _)
+global def addPlanEnvironmentPath key path plan = plan | editPlanEnvironmentPath key (path, _)
 
 # Get a list of file paths from the plan's environment variable
-global def getPlanPath key plan = match (getPlanVar key plan)
+global def getPlanEnvironmentPath key plan = match (getPlanEnvironmentVar key plan)
   Some path = path | tokenize `:`
   None = Nil
 
 # Set the plan's variable given a list of file paths.
-global def setPlanPath key path plan =
-    setPlanVar key (catWith ":" path) plan
+global def setPlanEnvironmentPath key path plan =
+    setPlanEnvironmentVar key (catWith ":" path) plan
 
 # Edit the list of paths contained in a plan variable
 # TODO: If variable doesn't exist, edit shouldn't create an empty variable
-global def editPlanPath key fn plan =
-    def oldPath = getPlanPath key plan
+global def editPlanEnvironmentPath key fn plan =
+    def oldPath = getPlanEnvironmentPath key plan
     def newPath = fn oldPath
-    setPlanPath key newPath plan
+    setPlanEnvironmentPath key newPath plan
 
 
 #############################################################################
 # Get or Set an environment variable in a plan.
 #############################################################################
-global def getPlanVar key plan =
+global def getPlanEnvironmentVar key plan =
     plan.getPlanEnvironment | getEnvironment key
 
-global def setPlanVar key value plan =
+global def setPlanEnvironmentVar key value plan =
   plan.getPlanEnvironment | setEnvironment key value | (setPlanEnvironment _ plan)
 
 #######################################################
@@ -89,12 +52,6 @@ global def verifyFiles files =
 global def quietResult result =
     result | rmap (\_ "")
 
-
-###################################################################################
-# When setting paths to system or utility directories, we may want to use absolute paths.
-#   DEPRECATED
-######################################################################################
-#global def absPath path = "{workspace}/{relative workspace path}"
 
 
 ###############################################################################
@@ -126,37 +83,3 @@ global def preinstall Unit =
 
     # Pass silently if all of them were successful. Otherwise, Fail.
     findFail results | rmap (\_ "")
-
-
-
-
-# A quick hello world test function
-def testHello _ =
-  makePlan  ("echo", "Hello World", Nil)  Nil
-  | runJob
-  | getJobStdout
-
-
-# A quick remapping test of environment variables.
-def testRemap _ =
-    makePlan ("sh", "-c", "/bin/echo -n $HERE", Nil)  (sources here `.*`)
-    | setPlanPath "HERE"  (".", Nil)
-    | planChdir "{here}" ("HERE", Nil)
-    | runJob
-    | getJobStdout  # Should get "../.."
-
-
-########################################################################################
-# Create a plan with defaults for running most system commands
-#   Basically, it is a regular default plan with additional variables
-#   required by common Linux commands or helpful to the wake environment.
-# DEPRECATED.
-#######################################################################################
-global def makeSystemPlan cmd visible =
-   makePlan cmd visible
-   | setPlanVar "PATH" (getenv "PATH" | getOrElse "/usr/local/bin:/usr/bin:/bin")   # Temporary debugging. use environment instead.
-   | setPlanVar  "WORKSPACE"  workspace  # A convenience for applications running under wake.
-   | setPlanVar "LANG"  "en_US.UTF8"
-   | setPlanVar "LC_ALL"  "en_US.UTF-8"
-   | setPlanVar "HOME"   "/tmp"  # Need a HOME - any valid temp directory will do.
-

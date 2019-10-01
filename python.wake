@@ -31,15 +31,15 @@ global def addPythonEnv pipDir plan =
     # Add the binary directory to PATH.
     plan
     | editPlanVisible (installed ++ _)
-    | addPlanPath  "PYTHONPATH"  venv
-    | addPlanPath  "PATH" "{venv}/bin"
+    | addPlanEnvironmentPath  "PYTHONPATH"  venv
+    | addPlanEnvironmentPath  "PATH" "{venv}/bin"
 
 
 ###########################################################################
 # Create an installer function which, when invoked, installs python virtual env.
 #    Note the extra "_" in the argument list
 ##########################################################################
-global def pythonInstaller pipdir _ =
+global def pythonInstaller pipdir Unit =
   installPipenvEnv pipdir | verifyFiles
 
 
@@ -83,7 +83,7 @@ target installPipenvEnv pipDir =
      | setPlanLocalOnly True       # TODO: remove when wake problem is resolved
      | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
-     | setPlanVar "PIPENV_VENV_IN_PROJECT" "YES"
+     | setPlanEnvironmentVar "PIPENV_VENV_IN_PROJECT" "YES"
      | setPlanDirectory "build/{pipDir}"
      | runJob
      | getJobOutputs
@@ -91,11 +91,6 @@ target installPipenvEnv pipDir =
    # Our return value is all of the files installed.
    pipenvOutputs ++ pipOutputs
 
-
-global def testPython Unit =
-    makeSystemPlan ("python3", "-v", Nil) Nil
-    | addPythonEnv "{here}/tests"
-    | runJob | getJobStdout
 
 
 # Remove a string from a list of strings.

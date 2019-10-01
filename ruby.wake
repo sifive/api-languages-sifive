@@ -28,8 +28,8 @@ global def addRubyEnv gemDir plan =
 
     # Update the plan to include the installed gems and binaries
     plan
-    | addPlanPath "PATH" "build/{gemDir}/.gem/bin"
-    | addPlanPath "GEM_PATH"  "build/{gemDir}/.gem"
+    | addPlanEnvironmentPath "PATH" "build/{gemDir}/.gem/bin"
+    | addPlanEnvironmentPath "GEM_PATH"  "build/{gemDir}/.gem"
     | editPlanVisible (installed ++ _)
 
 
@@ -37,7 +37,7 @@ global def addRubyEnv gemDir plan =
 # Create an installer function which, when invoked, installs Ruby gems.
 #    Note the extra "_" in the argument list
 ##########################################################################
-global def rubyInstaller gemdir _ =
+global def rubyInstaller gemdir Unit =
   installRubyEnv gemdir | verifyFiles
 
 
@@ -61,7 +61,7 @@ target installRubyEnv gemDir =
 
     # Invoke the bundler to install gems
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
-    makeSystemPlan cmd (gemFile, lock, Nil)
+    makePlan cmd (gemFile, lock, Nil)
     | setPlanLocalOnly True      # TODO: remove when wake issue resolved
     | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
     | setPlanDirectory "build/{gemDir}"
@@ -69,14 +69,4 @@ target installRubyEnv gemDir =
     | runJob
     | getJobOutputs
 
-
-
-##############################################################################
-# Test Ruby environment.
-################################################################################
-global def testRuby _ =
-    makePlan ("asciidoctor", "--version", Nil) Nil
-    | addRubyEnv "{here}/tests"
-    | runJob
-    | getJobStdout
 
