@@ -1,0 +1,105 @@
+############################################################################
+#
+# Python-Wake
+#
+# Supports multiple Python virtual environments through the "pipenv" mechanism.
+#   Each environment corresponds to a directory containing a Pipfile.
+#
+# To use the python virtual environment, add it to the command's plan.
+# For example,
+#     makePlan  (pythonCommand  "myscript.py" (arg1, ar2, Nil))  visibles
+#     | addPythonEnv  "directory containing Pipfile"
+#     | runJob
+#
+# If you have a specific python module to run, you can create the plan like this:
+#     makePlan (pythonModule my.module (arglist))  sources
+#
+# If you wish to download python modules ahead of time,
+#      publish preinstall = (pythonInstaller "directory-containing-Pipfile"), Nil
+# and he "wake preinstall Unit" call will then download the python modules.
+#
+#############################################################################
+
+
+
+######################################################
+# Add a Python virtual environment to a plan.
+#   Currently only supports pipenv, but this is where would examine the directory
+#   to see if other env managers are being used.
+##########################################################
+global def addPythonEnv pipDir plan =
+
+    # Install the virtual environment if not already done
+    def installed = installPipenvEnv pipDir
+    def venv = "build/{pipDir}/.venv"
+
+    # Add the binary directory to PATH.
+    plan
+    | editPlanVisible (installed ++ _)
+    | addPlanEnvironmentPath  "PYTHONPATH"  venv
+    | addPlanEnvironmentPath  "PATH" "{venv}/bin"
+
+
+###########################################################################
+# Create an installer function which, when invoked, installs python virtual env.
+#    Note the extra "Unit" in the argument list - it returns a function
+#    rather than doing the work immediately.
+##########################################################################
+global def pythonInstaller pipdir Unit =
+  installPipenvEnv pipdir | verifyFiles
+
+
+
+#######################################################################################
+# Commands for running Python. We suppress byte code since it causes concurrency problems with Wake.
+######################################################################################
+global def pythonCommand script args = ("python3", "-B", script, args)
+global def pythonModule module args = ("python3", "-B", "-m", module, args)
+
+
+
+##############################################################################
+# Install the python environment associated with Pipfile.lock.
+#  Note we install pipenv first, then use pipenv to install the remaining modules.
+#     For the workaround, the first step returns one file, and the second step
+#     returns all the files except that one.
+#     Appended together, we have a complete set of files.
+################################################################################
+target installPipenvEnv pipDir =
+
+   # Where we will install the virtual environment.
+   def venv = "build/{pipDir}/.venv"
+
+   # Step 1 - Copy Pipfile.lock to the build directory. Pipfile is just along for the ride.
+   def pipFile = installIn "build" (source "{pipDir}/Pipfile")
+   def lock = installIn "build" (source "{pipDir}/Pipfile.lock")
+
+   # Step 2 - Running from the build directory, use pip to install pipenv in .venv/bin
+   def pipOutputs =
+      makePlan ("pip3", "install", "--target=.venv", "pipenv", Nil) (pipFile, lock, Nil)
+      | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed.
+      | setPlanFnOutputs (\_ venv, Nil)  # TODO: Remove when wake problem is fixed.
+      | setPlanResources ("python/python/3.7.1", Nil)
+      | setPlanDirectory "build/{pipDir}"
+      | runJob
+      | getJobOutputs
+
+   # Step 3 - use pipenv and Pipfile.lock to install everything else in .venv.
+   def pipenvOutputs =
+     makePlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
+     | setPlanLocalOnly True       # TODO: remove when wake problem is resolved
+     | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
+     | setPlanResources ("python/python/3.7.1", Nil)
+     | setPlanEnvironmentVar "PIPENV_VENV_IN_PROJECT" "YES"
+     | setPlanDirectory "build/{pipDir}"
+     | runJob
+     | getJobOutputs
+
+   # Our return value is all of the files installed.
+   pipenvOutputs ++ pipOutputs
+
+
+
+# Remove a string from a list of strings.
+def remove string strings =
+    filter (_ !=~ string) strings

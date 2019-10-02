@@ -1,0 +1,72 @@
+##########################################################
+#
+# Ruby-Wake
+#
+# Supports multiple Ruby environments.
+#   Each ruby environment corresponds to a directory containing a "Gemfile" and "Gemfile.lock"
+#
+# To use the ruby environment, add it to the command's plan
+#     makePlan  cmd  visible
+#     | addRubyEnv  "directory containing Gemfile"
+#     | runJob
+#
+# If you wish to have the ruby gems downloaded by tne "preinstall" function.
+#      publish preinstall = (rubyInstaller "directory containing Gemfile"), Nil
+#
+# TODO: create a wrapper in .gem/bin which points to the correct version of Ruby.
+#
+############################################################
+
+
+##########################################################
+# Add a ruby environment to the plan
+##########################################################
+global def addRubyEnv gemDir plan =
+
+    # Install the ruby environment if not already done
+    def installed = installRubyEnv gemDir
+
+    # Update the plan to include the installed gems and binaries
+    plan
+    | addPlanEnvironmentPath "PATH" "build/{gemDir}/.gem/bin"
+    | addPlanEnvironmentPath "GEM_PATH"  "build/{gemDir}/.gem"
+    | editPlanVisible (installed ++ _)
+
+
+###########################################################################
+# Create an installer function which, when invoked, installs Ruby gems.
+#    Note the extra "_" in the argument list
+##########################################################################
+global def rubyInstaller gemdir Unit =
+  installRubyEnv gemdir | verifyFiles
+
+
+###########################################
+# Create a ruby command to run a gem with arguments
+#       makePlan  (rubyCommand "my.gem" args)  visible
+##################################################
+global def rubyCommand gem arglist =
+    "ruby", gem, arglist
+
+
+##############################################################################
+# Install a ruby bundler environment. Returns a list of installed files.
+#     Note the files will be installed in the "build" directory.
+################################################################################
+target installRubyEnv gemDir =
+
+    # Copy the package files to the build directory.
+    def gemFile = installIn "build" (source "{gemDir}/Gemfile")
+    def lock = installIn "build" (source "{gemDir}/Gemfile.lock")
+
+    # Invoke the bundler to install gems
+    def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
+    makePlan cmd (gemFile, lock, Nil)
+    | setPlanLocalOnly True      # TODO: remove when wake issue resolved
+    | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
+    | setPlanDirectory "build/{gemDir}"
+    | editPlanResources ("ruby/ruby/2.5.1", _)
+    | runJob
+    | getJobOutputs
+
+

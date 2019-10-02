@@ -1,0 +1,75 @@
+################################################################
+#
+# A set of generic functions for running system commands.
+#
+##################################################################################################
+
+
+#############################################################
+# Functions which manipulate PATH-like variables in a plan's environment
+#  "key" refers to the name of the environment variable  (eg. PATH or PYTHONPATH)
+###############################################################
+
+# Add a file path to the plan's environment variable
+global def addPlanEnvironmentPath key path plan = plan | editPlanEnvironmentPath key (path, _)
+
+# Get a list of file paths from the plan's environment variable
+global def getPlanEnvironmentPath key plan = match (getPlanEnvironmentVar key plan)
+  Some path = path | tokenize `:`
+  None = Nil
+
+# Set the plan's variable given a list of file paths.
+global def setPlanEnvironmentPath key path plan =
+    setPlanEnvironmentVar key (catWith ":" path) plan
+
+# Edit the list of paths contained in a plan variable
+# TODO: If variable doesn't exist, edit shouldn't create an empty variable
+global def editPlanEnvironmentPath key fn plan =
+    def oldPath = getPlanEnvironmentPath key plan
+    def newPath = fn oldPath
+    setPlanEnvironmentPath key newPath plan
+
+
+#############################################################################
+# Get or Set an environment variable in a plan.
+#############################################################################
+global def getPlanEnvironmentVar key plan =
+    plan.getPlanEnvironment | getEnvironment key
+
+global def setPlanEnvironmentVar key value plan =
+  plan.getPlanEnvironment | setEnvironment key value | (setPlanEnvironment _ plan)
+
+#######################################################
+# Pass if all the files are valid.  Fail if any are Bad
+######################################################
+global def verifyFiles files =
+    files | map getPathResult | findFail | quietResult
+
+
+############################################################################
+# If Pass, don't display the noisy results, but do show error message on Fail
+##########################################################################
+global def quietResult result =
+    result | rmap (\_ "")
+
+
+##########################################################################
+# A facility to preinstall whatever is needed by a wake project.
+#       publish preinstall = installFunction, Nil
+#
+# The "preinstall" function will will evaluate each of the installFunctions,
+# presumably when the workspace is being set up.
+#
+# Note each installFunction has type   Unit --> Result.
+#   Defensive programming would suggest the install functions should be:
+#     1) optional - the project should functon even if they are not evaluated, and
+#     2) idempotent - no harm if they are evaluated more than once.
+#   (These are suggestions, not requirements.)
+############################################################################
+global def preinstall Unit =
+
+    # Run all the pre-installation functions. Each returns Result.
+    def results = (subscribe preinstall) | map (_ Unit)
+
+    # Pass silently if all of them were successful. Otherwise, Fail.
+    findFail results | rmap (\_ "")

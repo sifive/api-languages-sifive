@@ -1,0 +1,76 @@
+##########################################################
+#
+# node-Wake
+#
+# Supports multiple Javascript virtual environments through the "npm" mechanism,
+#   where each virtual environment corresponds to a directory containing a "package.json" file.
+#
+# To use a node virtual environment, add it to the command's plan
+#     makePlan  cmd  visible
+#     | addNodeEnv  "directory containing package.json file"
+#     | runJob
+#
+# If you wish to have the node modules downloaded by tne "preinstall" function.
+#      publish preinstall = (nodeInstaller "directory containing package.json file"), Nil
+#
+############################################################
+
+
+
+##########################################################
+# Add an npm virtual environment to the plan
+##########################################################
+global def addNodeEnv packageDir plan =
+
+    # Install the npm virtual environment
+    def installed = installNodeEnv packageDir
+
+    # Add the installed modules to PATH and NODE_PATH
+    plan
+    | addPlanEnvironmentPath  "PATH" "build/{packageDir}/node_modules/.bin"
+    | addPlanEnvironmentPath  "NODE_PATH"  "build/{packageDir}/node_modules"
+    | editPlanVisible ( _ ++ installed )
+
+
+
+#########################################################################################
+# Create an installer function which, when invoked, installs a node (npm) virtual environment.
+#################################################################################
+global def nodeInstaller packageDir Unit =
+    installNodeEnv packageDir | verifyFiles
+
+
+
+#################################################################
+# Create a command for running a node module
+#################################################################
+global def nodeCommand module args  =
+    "node", "-e", "module", "--", args
+
+
+
+##############################################################################
+# Install a Javascript virtual environment.
+#    The binaries and packages will reside in the "build" directory.
+################################################################################
+target installNodeEnv packageDir =
+    # Copy the package files to the build directory
+    def pkg = installIn "build" (source "{packageDir}/package.json")
+    def lock = installIn "build" (source "{packageDir}/package-lock.json")
+
+    # The virtual environment will be in the build directory with the new package files.
+    makePlan ("npm", "install", Nil)  (pkg, lock, Nil)
+    | setPlanLocalOnly True   # Remove when wake issue resolved
+    | setPlanFnOutputs (\_ files "build/{packageDir}/node_modules" `.*`) # remove when wake issue resolved
+    | setPlanDirectory "build/{packageDir}"
+    | runJob
+    | getJobOutputs
+
+
+def testNode _ =
+    def version =
+        makePlan ("node", "-v", Nil)  Nil
+        | addNodeEnv "{here}/tests"
+        | runJob | getJobStdout
+    version
+
