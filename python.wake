@@ -5,13 +5,18 @@
 # Supports multiple Python virtual environments through the "pipenv" mechanism.
 #   Each environment corresponds to a directory containing a Pipfile.
 #
-# To use the python a virtual environment, add it to the command's plan
-#     makePlan  cmd  visible
+# To use the python virtual environment, add it to the command's plan.
+# For example,
+#     makePlan  (pythonCommand  "myscript.py" (arg1, ar2, Nil))  visibles
 #     | addPythonEnv  "directory containing Pipfile"
 #     | runJob
 #
-# If you wish to have the python modules downloaded by tne "preinstall" function.
+# If you have a specific python module to run, you can create the plan like this:
+#     makePlan (pythonModule my.module (arglist))  sources
+#
+# If you wish to download python modules ahead of time,
 #      publish preinstall = (pythonInstaller "directory-containing-Pipfile"), Nil
+# and he "wake preinstall Unit" call will then download the python modules.
 #
 #############################################################################
 
@@ -45,9 +50,10 @@ global def pythonInstaller pipdir Unit =
 
 
 #######################################################################################
-# Create a python command line based on the module name. Adds cmd line options as needed.
+# Commands for running Python. We suppress byte code since it causes concurrency problems with Wake.
 ######################################################################################
-global def pythonCommand module args = ("python3", "-m", module, args)
+global def pythonCommand script args = ("python3", "-B", script, args)
+global def pythonModule module args = ("python3", "-B", "-m", module, args)
 
 
 
