@@ -75,10 +75,11 @@ target installPythonEnv env =
    # Copy Pipfile.lock to the installation directory.
    def newDir = mkdir vdir | debug "newDir"
    def newLock = source lock | installAs "{vdir}/Pipfile.lock" | debug "newLock"
+   def newPip = source env.getPythonEnvPipfile | installAs "{vdir}/Pipfile"
 
    # Running from the build directory, use pip to install pipenv in .venv/bin
    def pipOutputs =
-      makePlan ("pip3", "install", "--target={venv}", "pipenv", Nil) (newLock, newDir, Nil)  # May be creating destination directory.
+      makePlan ("pip3", "install", "--target={venv}", "pipenv", Nil) (newLock, newDir, newPip, Nil)  # May be creating destination directory.
       | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed. (see node.wake)
       | setPlanFnOutputs (env.getPythonEnvVenv, _)  # TODO: Remove when wake problem is fixed.
       | setPlanResources ("python/python/3.7.1", Nil)
