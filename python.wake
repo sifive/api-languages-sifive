@@ -66,7 +66,7 @@ global def pythonModule module args = ("python3", "-B", "-m", module, args)
 target installPipenvEnv pipDir =
 
    # Where we will install the virtual environment.
-   def venv = "build/{pipDir}/.venv"
+   def venv = "{pipDir}/.venv"
 
    # Step - Get access to Pipfile.lock. Pipfile is just along for the ride.
    def pipFile = source "{pipDir}/Pipfile"
@@ -78,7 +78,7 @@ target installPipenvEnv pipDir =
       | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed. (see node.wake)
       | setPlanFnOutputs (\_ venv, Nil)  # TODO: Remove when wake problem is fixed.
       | setPlanResources ("python/python/3.7.1", Nil)
-      | setPlanDirectory "build/{pipDir}"
+      | setPlanDirectory pipDir
       | runJob
       | getJobOutputs
 
@@ -89,7 +89,7 @@ target installPipenvEnv pipDir =
      | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanEnvironmentVar "PIPENV_VENV_IN_PROJECT" "YES"
-     | setPlanDirectory "build/{pipDir}"
+     | setPlanDirectory pipDir
      | runJob
      | getJobOutputs
 

@@ -64,7 +64,7 @@ target installRubyEnv gemDir =
     makePlan cmd (gemFile, lock, Nil)
     | setPlanLocalOnly True      # TODO: remove when wake issue resolved (see node.wake)
     | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
-    | setPlanDirectory "build/{gemDir}"
+    | setPlanDirectory gemDir
     | editPlanResources ("ruby/ruby/2.5.1", _)
     | runJob
     | getJobOutputs
