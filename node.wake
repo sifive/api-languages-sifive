@@ -13,6 +13,9 @@
 # If you wish to have the node modules downloaded by tne "preinstall" function.
 #      publish preinstall = (nodeInstaller "directory containing package.json file"), Nil
 #
+# TODO: due to a bug in wake 15.2.2, we are not able to install node_modules
+# TODO:     using the fuse environment.  (issue with rename syscall)
+#
 ############################################################
 
 
@@ -54,9 +57,9 @@ global def nodeCommand module args  =
 #    The binaries and packages will reside in the "build" directory.
 ################################################################################
 target installNodeEnv packageDir =
-    # Copy the package files to the build directory
-    def pkg = installIn "build" (source "{packageDir}/package.json")
-    def lock = installIn "build" (source "{packageDir}/package-lock.json")
+    # Get access to the package files
+    def pkg = source "{packageDir}/package.json"
+    def lock = source "{packageDir}/package-lock.json"
 
     # The virtual environment will be in the build directory with the new package files.
     makePlan ("npm", "install", Nil)  (pkg, lock, Nil)
@@ -65,12 +68,3 @@ target installNodeEnv packageDir =
     | setPlanDirectory "build/{packageDir}"
     | runJob
     | getJobOutputs
-
-
-def testNode _ =
-    def version =
-        makePlan ("node", "-v", Nil)  Nil
-        | addNodeEnv "{here}/tests"
-        | runJob | getJobStdout
-    version
-

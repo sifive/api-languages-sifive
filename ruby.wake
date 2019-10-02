@@ -55,14 +55,14 @@ global def rubyCommand gem arglist =
 ################################################################################
 target installRubyEnv gemDir =
 
-    # Copy the package files to the build directory.
-    def gemFile = installIn "build" (source "{gemDir}/Gemfile")
-    def lock = installIn "build" (source "{gemDir}/Gemfile.lock")
+    # Access the gem files.
+    def gemFile = source "{gemDir}/Gemfile"
+    def lock = source "{gemDir}/Gemfile.lock"
 
     # Invoke the bundler to install gems
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
     makePlan cmd (gemFile, lock, Nil)
-    | setPlanLocalOnly True      # TODO: remove when wake issue resolved
+    | setPlanLocalOnly True      # TODO: remove when wake issue resolved (see node.wake)
     | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
     | setPlanDirectory "build/{gemDir}"
     | editPlanResources ("ruby/ruby/2.5.1", _)

@@ -54,15 +54,6 @@ global def quietResult result =
 
 
 
-###############################################################################
-# "debug"  - identity function which displays a message and a value for debugging.
-#    Can be invoked as:   expression | debug msg
-################################################################################
-global def debug msg x =
-      def _ = "Debug:{msg} {format x}" | println
-      x
-
-
 ##########################################################################
 # A facility to preinstall whatever is needed by a wake project.
 #       publish preinstall = installFunction, Nil
