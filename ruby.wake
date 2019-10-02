@@ -28,8 +28,8 @@ global def addRubyEnv gemDir plan =
 
     # Update the plan to include the installed gems and binaries
     plan
-    | addPlanEnvironmentPath "PATH" "build/{gemDir}/.gem/bin"
-    | addPlanEnvironmentPath "GEM_PATH"  "build/{gemDir}/.gem"
+    | addPlanEnvironmentPath "PATH" "{gemDir}/.gem/bin"
+    | addPlanEnvironmentPath "GEM_PATH"  "{gemDir}/.gem"
     | editPlanVisible (installed ++ _)
 
 
