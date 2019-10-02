@@ -42,7 +42,8 @@ global def addPythonEnv pipDir plan =
 
 ###########################################################################
 # Create an installer function which, when invoked, installs python virtual env.
-#    Note the extra "_" in the argument list
+#    Note the extra "Unit" in the argument list - it returns a function
+#    rather than doing the work immediately.
 ##########################################################################
 global def pythonInstaller pipdir Unit =
   installPipenvEnv pipdir | verifyFiles
