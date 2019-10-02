@@ -18,6 +18,9 @@
 #      publish preinstall = (pythonInstaller "directory-containing-Pipfile"), Nil
 #
 #############################################################################
+global tuple PythonEnv =
+  global Pipfile: String
+  global Venv: String
 
 
 
@@ -26,25 +29,24 @@
 #   Currently only supports pipenv, but this is where would examine the directory
 #   to see if other env managers are being used.
 ##########################################################
-global def addPythonEnv pipDir plan =
+global def addPythonEnv env plan =
 
     # Install the virtual environment if not already done
-    def installed = installPipenvEnv pipDir
-    def venv = "build/{pipDir}/.venv"
+    def installed = installPythonEnv env
 
     # Add the binary directory to PATH.
     plan
     | editPlanVisible (installed ++ _)
-    | addPlanEnvironmentPath  "PYTHONPATH"  venv
-    | addPlanEnvironmentPath  "PATH" "{venv}/bin"
+    | addPlanEnvironmentPath  "PYTHONPATH"  env.getPythonEnvVenv
+    | addPlanEnvironmentPath  "PATH" "{env.getPythonEnvVenv}/bin"
 
 
 ###########################################################################
 # Create an installer function which, when invoked, installs python virtual env.
 #    Note the extra "_" in the argument list
 ##########################################################################
-global def pythonInstaller pipdir Unit =
-  installPipenvEnv pipdir | verifyFiles
+global def pythonInstaller env Unit =
+  installPythonEnv env | verifyFiles
 
 
 
@@ -63,33 +65,35 @@ global def pythonModule module args = ("python3", "-B", "-m", module, args)
 #     returns all the files except that one.
 #     Appended together, we have a complete set of files.
 ################################################################################
-target installPipenvEnv pipDir =
+target installPythonEnv env =
 
    # Where we will install the virtual environment.
-   def venv = "{pipDir}/.venv"
+   def vdir = simplify "{env.getPythonEnvVenv}/.."  # The directory containing the viritual environment
+   def venv = relative vdir env.getPythonEnvVenv # The name of the virtual environment within the directory. ".venv"
+   def lock = "{env.getPythonEnvPipfile}.lock" | debug "pipfile.lock"
 
-   # Step - Get access to Pipfile.lock. Pipfile is just along for the ride.
-   def pipFile = source "{pipDir}/Pipfile"
-   def lock = source "{pipDir}/Pipfile.lock"
+   # Copy Pipfile.lock to the installation directory.
+   def newDir = mkdir vdir | debug "newDir"
+   def newLock = source lock | installAs "{vdir}/Pipfile.lock" | debug "newLock"
 
-   # Step - Running from the build directory, use pip to install pipenv in .venv/bin
+   # Running from the build directory, use pip to install pipenv in .venv/bin
    def pipOutputs =
-      makePlan ("pip3", "install", "--target=.venv", "pipenv", Nil) Nil
+      makePlan ("pip3", "install", "--target={venv}", "pipenv", Nil) (newLock, newDir, Nil)  # May be creating destination directory.
       | setPlanLocalOnly True   # TODO: Remove when wake problem is fixed. (see node.wake)
-      | setPlanFnOutputs (\_ venv, Nil)  # TODO: Remove when wake problem is fixed.
+      | setPlanFnOutputs (env.getPythonEnvVenv, _)  # TODO: Remove when wake problem is fixed.
       | setPlanResources ("python/python/3.7.1", Nil)
-      | setPlanDirectory pipDir
+      | setPlanDirectory vdir
       | runJob
-      | getJobOutputs
+      | getJobOutputs | debug "pipOutputs"
 
-   # Step - use pipenv and Pipfile.lock to install everything else in .venv.
+   # Use pipenv and Pipfile.lock to install everything else in .venv.
    def pipenvOutputs =
-     makePlan (".venv/bin/pipenv",  "sync", "--dev", Nil) (pipFile, lock, pipOutputs)
+     makePlan ("{venv}/bin/pipenv",  "sync", "--dev", Nil) (newLock, pipOutputs)
      | setPlanLocalOnly True       # TODO: remove when wake problem is resolved
      | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanEnvironmentVar "PIPENV_VENV_IN_PROJECT" "YES"
-     | setPlanDirectory pipDir
+     | setPlanDirectory vdir
      | runJob
      | getJobOutputs
 
