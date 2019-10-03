@@ -61,7 +61,7 @@ target installRubyEnv gemDir =
 
     # Invoke the bundler to install gems
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
-    makePlan cmd (gemFile, lock, Nil)
+    makeSystemPlan cmd (gemFile, lock, Nil)
     | setPlanLocalOnly True      # TODO: remove when wake issue resolved
     | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
     | setPlanDirectory "build/{gemDir}"
