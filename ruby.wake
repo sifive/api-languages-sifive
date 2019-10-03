@@ -52,6 +52,8 @@ global def rubyCommand gem arglist =
 ##############################################################################
 # Install a ruby bundler environment. Returns a list of installed files.
 #     Note the files will be installed in the "build" directory.
+#     Note: Ruby likes to have a HOME directory, but setting HOME doesn't
+#     seem to do the job. It creates its own temp directory anyway.
 ################################################################################
 target installRubyEnv gemDir =
 
@@ -61,12 +63,14 @@ target installRubyEnv gemDir =
 
     # Invoke the bundler to install gems
     def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
-    makeSystemPlan cmd (gemFile, lock, Nil)
+    makePlan cmd (gemFile, lock, Nil)
     | setPlanLocalOnly True      # TODO: remove when wake issue resolved
     | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
     | setPlanDirectory "build/{gemDir}"
     | editPlanResources ("ruby/ruby/2.5.1", _)
     | runJob
     | getJobOutputs
+
+
 
 
