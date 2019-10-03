@@ -38,6 +38,7 @@ global def addPythonEnv pipDir plan =
     | editPlanVisible (installed ++ _)
     | addPlanEnvironmentPath  "PYTHONPATH"  venv
     | addPlanEnvironmentPath  "PATH" "{venv}/bin"
+    | setPlanEnvironmentVar "HOME"  "/tmp"
 
 
 ###########################################################################
@@ -91,6 +92,7 @@ target installPipenvEnv pipDir =
      | setPlanFnOutputs ( \_ remove venv (files venv `.*`) ) # TODO: remove when wake problem is resolved
      | setPlanResources ("python/python/3.7.1", Nil)
      | setPlanEnvironmentVar "PIPENV_VENV_IN_PROJECT" "YES"
+     | addPlanEnvironmentPath "PYTHONPATH" ".venv"
      | setPlanDirectory "build/{pipDir}"
      | runJob
      | getJobOutputs
