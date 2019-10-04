@@ -72,11 +72,11 @@ target installRubyEnv gemDir =
         | getJobOutputs
 
     # Invoke the bundler to install gems.
-    def cmd = ("{gem}/bin/bundle", "install", "--path={gem}", "--no-cache", "--standalone", "--quiet", "--gemfile={gemFile.getPathName}",  "--binstubs=.gem/bin", Nil)
+    def cmd = ("{gem}/bin/bundle", "install", "--path={gem}", "--no-cache", "--standalone", "--quiet", "--gemfile={gemFile.getPathName}", "--binstubs=.gem/bin", Nil)
     def bundlerOut =
         makePlan cmd (gemFile, lock, bundlerInstallOut)
         | editPlanResources ("ruby/ruby/2.5.1", _)
-        | setPlanEnvironmentVar "BUNDLE_HOME"  "build/{gemDir}"
+        | setPlanEnvironmentVar "HOME"  "{workspace}/build/{gemDir}"  # Needs to be an absolute path to suppress "/ not writable" message.
         | runJob
         | getJobOutputs
 
