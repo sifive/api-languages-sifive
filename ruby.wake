@@ -61,15 +61,27 @@ target installRubyEnv gemDir =
     def gemFile = installIn "build" (source "{gemDir}/Gemfile")
     def lock = installIn "build" (source "{gemDir}/Gemfile.lock")
 
-    # Invoke the bundler to install gems
-    def cmd = ("bundle", "install", "--path=.gem", "--no-cache", "--standalone", "--gemfile=Gemfile", "--binstubs=.gem/bin", Nil)
-    makePlan cmd (gemFile, lock, Nil)
-    | setPlanLocalOnly True      # TODO: remove when wake issue resolved
-    | setPlanFnOutputs (\_ files "build/{gemDir}/.gem" `.*`)  # TODO: remove when wake issue resolved.
-    | setPlanDirectory "build/{gemDir}"
-    | editPlanResources ("ruby/ruby/2.5.1", _)
-    | runJob
-    | getJobOutputs
+    # Target directory where gems are installed
+    def gem = "build/{gemDir}/.gem"
+
+    # Install the gem bundler. Depends on gemFile, not for the gemFile but for the directory it resides in.
+    def bundlerInstallOut =
+        makePlan ("gem", "install", "bundler", "-v", ">=2", "--install-dir", gem, Nil)  (gemFile, lock, Nil)
+        | editPlanResources ("ruby/ruby/2.5.1", _)
+        | runJob
+        | getJobOutputs
+
+    # Invoke the bundler to install gems.
+    def cmd = ("{gem}/bin/bundle", "install", "--path={gem}", "--no-cache", "--standalone", "--quiet", "--gemfile={gemFile.getPathName}", "--binstubs=.gem/bin", Nil)
+    def bundlerOut =
+        makePlan cmd (gemFile, lock, bundlerInstallOut)
+        | editPlanResources ("ruby/ruby/2.5.1", _)
+        | setPlanEnvironmentVar "HOME"  "{workspace}/build/{gemDir}"  # Needs to be an absolute path to suppress "/ not writable" message.
+        | runJob
+        | getJobOutputs
+
+    # Return the list of files installed by both steps
+    bundlerOut ++ bundlerInstallOut
 
 
 
