@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  echo "Create a Python virtual environment with dependencies from a Pipfile"
+  echo "Usage: $(basename "$0") <pipfile> <pipfile-lock> <venv-dir>"
+}
+
+if [[ $# -ne 3 ]]; then
+  usage
+  exit 1
+fi
+
+pipfile="$1"
+pipfile_lock="$2"
+venv_dir="$3"
+
+if [[ $(dirname "$pipfile") != $(dirname "$pipfile_lock") ]]; then
+  echo "Pipfile and Pipfile.lock must be in the same directory."
+  exit 2
+fi
+
+# Create virtual environment
+mkdir -p "$venv_dir"
+# Note: The --copies flag is important here because it tells venv to copy
+# rather than symlink in library files, which is important for the virtual
+# environment to function properly in a sandboxed Wake execution.
+python3.7 -m venv --copies "$venv_dir"
+
+# Install pipenv into virtual environment
+"${venv_dir}/bin/pip" install pipenv==v2018.10.13
+
+# Activate virtual environment and have pipenv install packages from
+# Pipfile.lock into the virtual environment.
+. "${venv_dir}/bin/activate"
+PIPENV_PIPFILE="$pipfile" pipenv sync
