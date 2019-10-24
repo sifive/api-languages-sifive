@@ -76,6 +76,7 @@ target installRubyEnv gemDir =
     def bundlerOut =
         makePlan cmd (gemFile, lock, bundlerInstallOut)
         | editPlanResources ("ruby/ruby/2.5.1", _)
+        | addPlanEnvironmentPath "GEM_PATH"  "build/{gemDir}/.gem"
         | setPlanEnvironmentVar "HOME"  "{workspace}/build/{gemDir}"  # Needs to be an absolute path to suppress "/ not writable" message.
         | runJob
         | getJobOutputs
