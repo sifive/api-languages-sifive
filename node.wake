@@ -27,8 +27,8 @@ global def addNodeEnv packageDir plan =
 
     # Add the installed modules to PATH and NODE_PATH
     plan
-    | addPlanEnvironmentPath  "PATH" "build/{packageDir}/node_modules/.bin"
-    | addPlanEnvironmentPath  "NODE_PATH"  "build/{packageDir}/node_modules"
+    | addPlanRelativePath  "PATH" "build/{packageDir}/node_modules/.bin"
+    | addPlanRelativePath  "NODE_PATH"  "build/{packageDir}/node_modules"
     | editPlanVisible ( _ ++ installed )
 
 
@@ -65,12 +65,4 @@ target installNodeEnv packageDir =
     | setPlanDirectory "build/{packageDir}"
     | runJob
     | getJobOutputs
-
-
-def testNode _ =
-    def version =
-        makePlan ("node", "-v", Nil)  Nil
-        | addNodeEnv "{here}/tests"
-        | runJob | getJobStdout
-    version
 

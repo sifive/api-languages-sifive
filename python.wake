@@ -16,7 +16,7 @@
 #
 # If you wish to download python modules ahead of time,
 #      publish preinstall = (pythonInstaller "directory-containing-Pipfile"), Nil
-# and he "wake preinstall Unit" call will then download the python modules.
+# and the "wake preinstall Unit" call will then download the python modules.
 #
 #############################################################################
 
@@ -36,8 +36,8 @@ global def addPythonEnv pipDir plan =
   # Add the binary directory to PATH.
   plan
   | editPlanVisible (installed ++ _)
-  | addPlanEnvironmentPath  "PYTHONPATH"  venv
-  | addPlanEnvironmentPath  "PATH" "{venv}/bin"
+  | addPlanRelativePath  "PYTHONPATH"  venv
+  | addPlanRelativePath  "PATH" "{venv}/bin"
 
 
 ###########################################################################
