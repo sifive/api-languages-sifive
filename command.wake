@@ -30,6 +30,15 @@ global def editPlanEnvironmentPath key fn plan =
     setPlanEnvironmentPath key newPath plan
 
 
+################################################################################
+# Add a relative file path to the plan's environment variable.
+#   If a plan has set a new working directory, then
+#   this function converts the path so it is relative to the new working directory.
+#################################################################################
+global def addPlanRelativePath key path plan =
+  plan | addPlanEnvironmentPath  key (relative plan.getPlanDirectory path)
+
+
 #############################################################################
 # Get or Set an environment variable in a plan.
 #############################################################################
@@ -54,20 +63,6 @@ global def quietResult result =
 
 
 
-########################################################################################
-# Create a plan with defaults for running most system commands
-#   Basically, it is a regular default plan with additional variables
-#   required by common Linux commands or helpful to the wake environment.
-# DEPRECATED.
-#######################################################################################
-global def makeSystemPlan cmd visible =
-   makePlan cmd visible
-   | setPlanEnvironmentVar "LANG"  "en_US.UTF8"
-   | setPlanEnvironmentVar "LC_ALL"  "en_US.UTF-8"
-   | setPlanEnvironmentVar "HOME"   "/tmp"  # Need a HOME - any valid temp directory will do.
-
-
-
 ##########################################################################
 # A facility to preinstall whatever is needed by a wake project.
 #       publish preinstall = installFunction, Nil
@@ -87,4 +82,4 @@ global def preinstall Unit =
     def results = (subscribe preinstall) | map (_ Unit)
 
     # Pass silently if all of them were successful. Otherwise, Fail.
-    findFail results | rmap (\_ "")
+    findFail results | quietResult
