@@ -59,7 +59,8 @@ target installNodeEnv packageDir =
     def lock = installIn "build" (source "{packageDir}/package-lock.json")
 
     # The virtual environment will be in the build directory with the new package files.
-    makePlan ("npm", "install", Nil)  (pkg, lock, Nil)
+    #  Note the use of "ci" to install. The "ci" command ensures the lock file does not get updated.
+    makePlan ("npm", "ci", Nil)  (pkg, lock, Nil)
     | setPlanLocalOnly True   # Remove when wake issue resolved
     | setPlanFnOutputs (\_ files "build/{packageDir}/node_modules" `.*`) # remove when wake issue resolved
     | setPlanDirectory "build/{packageDir}"

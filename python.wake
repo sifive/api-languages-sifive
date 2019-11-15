@@ -38,6 +38,7 @@ global def addPythonEnv pipDir plan =
   | editPlanVisible (installed ++ _)
   | addPlanRelativePath  "PYTHONPATH"  venv
   | addPlanRelativePath  "PATH" "{venv}/bin"
+  | setPlanEnvironmentVar "VIRTUAL_ENV"  venv
 
 
 ###########################################################################
@@ -60,11 +61,24 @@ global def pythonModule module args = ("python3.7", "-B", "-m", module, args)
 
 ##############################################################################
 # Install the python environment associated with Pipfile.lock.
-#  Note we install pipenv first, then use pipenv to install the remaining modules.
-#     For the workaround, the first step returns one file, and the second step
-#     returns all the files except that one.
-#     Appended together, we have a complete set of files.
-################################################################################
+#
+# NOTE: When installing to the .venv/bin directory,
+#   pipenv creates scripts which embed the "realpath"
+#   of the Python binary. Under Wake, these paths contain
+#   explicit references to the Fuse directories.
+#
+#   So, pipenv creates invalid paths like the following:
+#       /workspace/.build/91/.venv/bin/python3.7
+#   when it should create the following path:
+#       /workspace/.venv/bin/python3.7
+#
+#   The invalid paths work fine during the initial Wake invocation,
+#   but they are completely invalid on subsequent invocations of Wake.
+#
+#   Ideally, we would rewrite pipenv so it doesn't use "realpath", but that isn't an option.
+#   Instead, we run pipenv outside of Fuse so it generates correct paths.
+#
+#################################################################################
 target installPipenvEnv pipDir =
 
   # Where we will install the virtual environment.
@@ -73,6 +87,7 @@ target installPipenvEnv pipDir =
   def lock = installIn "build" (source "{pipDir}/Pipfile.lock")
   def installPipenvScript = source "{here}/install-python-pipenv"
 
+  # Build up the command "install-python-pipe  <pipfile>  <lockfile>  <venv>"
   def args =
     installPipenvScript.getPathName,
     pipFile.getPathName,
@@ -82,13 +97,19 @@ target installPipenvEnv pipDir =
 
   def visible = installPipenvScript, pipFile, lock, Nil
 
+  # Create a plan to run the script and create a virtual environment.
   makePlan args visible
   | setPlanResources ("python/python/3.7.1", Nil)
+
+  # Disable Fuse since it is incompatible with pipenv.
+  | setPlanLocalOnly True
+  | setPlanFnOutputs (\_ files venv `.*`)
+
+  # Workaround for a bug in Wake 0.15.3 and 0.17.2 when running in Docker containers.
+  #   In Docker, wake remaps file paths even though the plan is "Local Only".
+  #   Work around the problem by setting the working directory to an absolute path.
+  | setPlanDirectory workspace
+
+  # Finally, run the plan and return tbe list of files installed in the venv.
   | runJob
   | getJobOutputs
-
-
-
-# Remove a string from a list of strings.
-def remove string strings =
-  filter (_ !=~ string) strings
