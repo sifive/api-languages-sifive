@@ -38,7 +38,6 @@ global def addPythonEnv pipDir plan =
   | editPlanVisible (installed ++ _)
   | addPlanRelativePath  "PYTHONPATH"  venv
   | addPlanRelativePath  "PATH" "{venv}/bin"
-  | setPlanEnvironmentVar "VIRTUAL_ENV"  venv
 
 
 ###########################################################################
