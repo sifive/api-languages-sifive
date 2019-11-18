@@ -62,7 +62,7 @@ global def pythonModule module args = ("python3.7", "-B", "-m", module, args)
 ##############################################################################
 # Install the python environment associated with Pipfile.lock.
 #
-# NOTE: When installing to the .venv/bin directory,
+# WARNING: When installing to the .venv/bin directory,
 #   pipenv creates scripts which embed the "realpath"
 #   of the Python binary. Under Wake, these paths contain
 #   explicit references to the Fuse directories.
@@ -72,11 +72,8 @@ global def pythonModule module args = ("python3.7", "-B", "-m", module, args)
 #   when it should create the following path:
 #       /workspace/.venv/bin/python3.7
 #
-#   The invalid paths work fine during the initial Wake invocation,
-#   but they are completely invalid on subsequent invocations of Wake.
-#
-#   Ideally, we would rewrite pipenv so it doesn't use "realpath", but that isn't an option.
-#   Instead, we run pipenv outside of Fuse so it generates correct paths.
+#   There will be an upcoming fix for this problem, but for now,
+#   do not use scripts installed under pipenv's bin directory.
 #
 #################################################################################
 target installPipenvEnv pipDir =
@@ -100,10 +97,6 @@ target installPipenvEnv pipDir =
   # Create a plan to run the script and create a virtual environment.
   makePlan args visible
   | setPlanResources ("python/python/3.7.1", Nil)
-
-  # Disable Fuse since it is incompatible with pipenv.
-  | setPlanLocalOnly True
-  | setPlanFnOutputs (\_ files venv `.*`)
 
   # Finally, run the plan and return tbe list of files installed in the venv.
   | runJob
