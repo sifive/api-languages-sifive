@@ -105,11 +105,6 @@ target installPipenvEnv pipDir =
   | setPlanLocalOnly True
   | setPlanFnOutputs (\_ files venv `.*`)
 
-  # Workaround for a bug in Wake 0.15.3 and 0.17.2 when running in Docker containers.
-  #   In Docker, wake remaps file paths even though the plan is "Local Only".
-  #   Work around the problem by setting the working directory to an absolute path.
-  | setPlanDirectory workspace
-
   # Finally, run the plan and return tbe list of files installed in the venv.
   | runJob
   | getJobOutputs
