@@ -60,11 +60,21 @@ global def pythonModule module args = ("python3.7", "-B", "-m", module, args)
 
 ##############################################################################
 # Install the python environment associated with Pipfile.lock.
-#  Note we install pipenv first, then use pipenv to install the remaining modules.
-#     For the workaround, the first step returns one file, and the second step
-#     returns all the files except that one.
-#     Appended together, we have a complete set of files.
-################################################################################
+#
+# WARNING: When installing to the .venv/bin directory,
+#   pipenv creates scripts which embed the "realpath"
+#   of the Python binary. Under Wake, these paths contain
+#   explicit references to the Fuse directories.
+#
+#   So, pipenv creates invalid paths like the following:
+#       /workspace/.build/91/.venv/bin/python3.7
+#   when it should create the following path:
+#       /workspace/.venv/bin/python3.7
+#
+#   There will be an upcoming fix for this problem, but for now,
+#   do not use scripts installed under pipenv's bin directory.
+#
+#################################################################################
 target installPipenvEnv pipDir =
 
   # Where we will install the virtual environment.
@@ -73,6 +83,7 @@ target installPipenvEnv pipDir =
   def lock = installIn "build" (source "{pipDir}/Pipfile.lock")
   def installPipenvScript = source "{here}/install-python-pipenv"
 
+  # Build up the command "install-python-pipe  <pipfile>  <lockfile>  <venv>"
   def args =
     installPipenvScript.getPathName,
     pipFile.getPathName,
@@ -82,13 +93,10 @@ target installPipenvEnv pipDir =
 
   def visible = installPipenvScript, pipFile, lock, Nil
 
+  # Create a plan to run the script and create a virtual environment.
   makePlan args visible
   | setPlanResources ("python/python/3.7.1", Nil)
+
+  # Finally, run the plan and return tbe list of files installed in the venv.
   | runJob
   | getJobOutputs
-
-
-
-# Remove a string from a list of strings.
-def remove string strings =
-  filter (_ !=~ string) strings
