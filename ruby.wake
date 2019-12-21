@@ -72,7 +72,7 @@ target installRubyEnv gemDir =
         | getJobOutputs
 
     # Invoke the bundler to install gems.
-    def cmd = ("{gem}/bin/bundle", "install", "--path={gem}", "--no-cache", "--standalone", "--quiet", "--gemfile={gemFile.getPathName}", "--binstubs=.gem/bin", Nil)
+    def cmd = ("{gem}/bin/bundle", "install", "--deployment", "--path={gem}", "--no-cache", "--standalone", "--quiet", "--gemfile={gemFile.getPathName}", "--binstubs=.gem/bin", Nil)
     def bundlerOut =
         makePlan cmd (gemFile, lock, bundlerInstallOut)
         | editPlanResources ("ruby/ruby/2.5.1", _)
