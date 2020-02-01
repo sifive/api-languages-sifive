@@ -28,9 +28,24 @@
 #   to see if other env managers are being used.
 ##########################################################
 global def addPythonEnv pipDir plan =
-
   # Install the virtual environment if not already done
   def installed = installPipenvEnv pipDir
+  def venv = "build/{pipDir}/.venv"
+
+  # Add the binary directory to PATH.
+  plan
+  | editPlanVisible (installed ++ _)
+  | addPlanRelativePath  "PYTHONPATH"  venv
+  | addPlanRelativePath  "PATH" "{venv}/bin"
+
+######################################################
+# Add a Python virtual environment to a plan.
+#   This provides an alternative to addPythonEnv which
+#   supports requirements.txt
+######################################################
+global def addPythonRequirementsEnv pipDir plan =
+  # Install the virtual environment if not already done
+  def installed = installPythonRequirementsEnv pipDir
   def venv = "build/{pipDir}/.venv"
 
   # Add the binary directory to PATH.
@@ -48,6 +63,13 @@ global def addPythonEnv pipDir plan =
 global def pythonInstaller pipdir Unit =
   installPipenvEnv pipdir | verifyFiles
 
+###########################################################################
+# Corresponding installer function for python virtual envs from requirements.txt
+#    Note the extra "Unit" in the argument list - it returns a function
+#    rather than doing the work immediately.
+##########################################################################
+global def pythonRequirementsInstaller pipdir Unit =
+  installPythonRequirementsEnv pipdir | verifyFiles
 
 
 #######################################################################################
@@ -92,6 +114,47 @@ target installPipenvEnv pipDir =
     Nil
 
   def visible = installPipenvScript, pipFile, lock, Nil
+
+  # Create a plan to run the script and create a virtual environment.
+  makePlan args visible
+  | setPlanResources ("python/python/3.7.1", Nil)
+
+  # Finally, run the plan and return tbe list of files installed in the venv.
+  | runJob
+  | getJobOutputs
+
+##############################################################################
+# Install the python environment associated with requirements.txt
+#
+# WARNING: When installing to the .venv/bin directory,
+#   pipenv creates scripts which embed the "realpath"
+#   of the Python binary. Under Wake, these paths contain
+#   explicit references to the Fuse directories.
+#
+#   So, pipenv creates invalid paths like the following:
+#       /workspace/.build/91/.venv/bin/python3.7
+#   when it should create the following path:
+#       /workspace/.venv/bin/python3.7
+#
+#   There will be an upcoming fix for this problem, but for now,
+#   do not use scripts installed under pipenv's bin directory.
+#
+#################################################################################
+target installPythonRequirementsEnv pipDir =
+
+  # Where we will install the virtual environment.
+  def venv = "build/{pipDir}/.venv"
+  def requirements = installIn "build" (source "{pipDir}/requirements.txt")
+  def installPythonRequirementsScript = source "{here}/install-python-requirements"
+
+  # Build up the command "install-python-pipe  <requirements.txt>  <venv>"
+  def args =
+    installPythonRequirementsScript.getPathName,
+    requirements.getPathName,
+    venv,
+    Nil
+
+  def visible = installPythonRequirementsScript, requirements, Nil
 
   # Create a plan to run the script and create a virtual environment.
   makePlan args visible
