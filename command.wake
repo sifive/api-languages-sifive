@@ -76,6 +76,7 @@ global def quietResult result =
 #     2) idempotent - no harm if they are evaluated more than once.
 #   (These are suggestions, not requirements.)
 ############################################################################
+global topic preinstall : Unit => Result String Error
 global def preinstall Unit =
 
     # Run all the pre-installation functions. Each returns Result.
