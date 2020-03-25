@@ -21,6 +21,7 @@
 #############################################################################
 
 
+global def apiLanguagesSifiveBuildDir = "build/api-languages-sifive"
 
 ######################################################
 # Add a Python virtual environment to a plan.
@@ -30,7 +31,7 @@
 global def addPythonEnv pipDir plan =
   # Install the virtual environment if not already done
   def installed = installPipenvEnv pipDir
-  def venv = "build/{pipDir}/.venv"
+  def venv = "{apiLanguagesSifiveBuildDir}/{pipDir}/.venv"
 
   # Add the binary directory to PATH.
   plan
@@ -46,7 +47,7 @@ global def addPythonEnv pipDir plan =
 global def addPythonRequirementsEnv pipDir plan =
   # Install the virtual environment if not already done
   def installed = installPythonRequirementsEnv pipDir
-  def venv = "build/{pipDir}/.venv"
+  def venv = "{apiLanguagesSifiveBuildDir}/{pipDir}/.venv"
 
   # Add the binary directory to PATH.
   plan
@@ -100,9 +101,9 @@ global def pythonModule module args = ("python3.7", "-B", "-m", module, args)
 target installPipenvEnv pipDir =
 
   # Where we will install the virtual environment.
-  def venv = "build/{pipDir}/.venv"
-  def pipFile = installIn "build" (source "{pipDir}/Pipfile")
-  def lock = installIn "build" (source "{pipDir}/Pipfile.lock")
+  def venv = "{apiLanguagesSifiveBuildDir}/{pipDir}/.venv"
+  def pipFile = installIn apiLanguagesSifiveBuildDir (source "{pipDir}/Pipfile")
+  def lock = installIn apiLanguagesSifiveBuildDir (source "{pipDir}/Pipfile.lock")
   def installPipenvScript = source "{here}/install-python-pipenv"
 
   # Build up the command "install-python-pipe  <pipfile>  <lockfile>  <venv>"
@@ -143,8 +144,8 @@ target installPipenvEnv pipDir =
 target installPythonRequirementsEnv pipDir =
 
   # Where we will install the virtual environment.
-  def venv = "build/{pipDir}/.venv"
-  def requirements = installIn "build" (source "{pipDir}/requirements.txt")
+  def venv = "{apiLanguagesSifiveBuildDir}/{pipDir}/.venv"
+  def requirements = installIn apiLanguagesSifiveBuildDir (source "{pipDir}/requirements.txt")
   def installPythonRequirementsScript = source "{here}/install-python-requirements"
 
   # Build up the command "install-python-pipe  <requirements.txt>  <venv>"
