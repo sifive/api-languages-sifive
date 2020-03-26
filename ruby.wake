@@ -28,8 +28,8 @@ global def addRubyEnv gemDir plan =
 
     # Update the plan to include the installed gems and binaries
     plan
-    | addPlanRelativePath "PATH" "build/{gemDir}/.gem/bin"
-    | addPlanRelativePath "GEM_PATH"  "build/{gemDir}/.gem"
+    | addPlanRelativePath "PATH" "{apiLanguagesSifiveBuildDir}/{gemDir}/.gem/bin"
+    | addPlanRelativePath "GEM_PATH"  "{apiLanguagesSifiveBuildDir}/{gemDir}/.gem"
     | editPlanVisible (installed ++ _)
 
 
@@ -58,11 +58,11 @@ global def rubyCommand gem arglist =
 target installRubyEnv gemDir =
 
     # Copy the package files to the build directory.
-    def gemFile = installIn "build" (source "{gemDir}/Gemfile")
-    def lock = installIn "build" (source "{gemDir}/Gemfile.lock")
+    def gemFile = installIn apiLanguagesSifiveBuildDir (source "{gemDir}/Gemfile")
+    def lock = installIn apiLanguagesSifiveBuildDir (source "{gemDir}/Gemfile.lock")
 
     # Target directory where gems are installed
-    def gem = "build/{gemDir}/.gem"
+    def gem = "{apiLanguagesSifiveBuildDir}/{gemDir}/.gem"
 
     # Install the gem bundler. Depends on gemFile, not for the gemFile but for the directory it resides in.
     def bundlerInstallOut =
@@ -76,8 +76,8 @@ target installRubyEnv gemDir =
     def bundlerOut =
         makePlan cmd (gemFile, lock, bundlerInstallOut)
         | editPlanResources ("ruby/ruby/2.5.1", _)
-        | addPlanEnvironmentPath "GEM_PATH"  "build/{gemDir}/.gem"
-        | setPlanEnvironmentVar "HOME"  "{workspace}/build/{gemDir}"  # Needs to be an absolute path to suppress "/ not writable" message.
+        | addPlanEnvironmentPath "GEM_PATH"  "{apiLanguagesSifiveBuildDir}/{gemDir}/.gem"
+        | setPlanEnvironmentVar "HOME"  "{workspace}/{apiLanguagesSifiveBuildDir}/{gemDir}"  # Needs to be an absolute path to suppress "/ not writable" message.
         | runJob
         | getJobOutputs
 
