@@ -15,7 +15,7 @@
 #
 ############################################################
 
-
+def nodeResource = "nodejs/nodejs/10.15.0"
 
 ##########################################################
 # Add an npm virtual environment to the plan
@@ -29,6 +29,7 @@ global def addNodeEnv packageDir plan =
     plan
     | addPlanRelativePath  "PATH" "{apiLanguagesSifiveBuildDir}/{packageDir}/node_modules/.bin"
     | addPlanRelativePath  "NODE_PATH"  "{apiLanguagesSifiveBuildDir}/{packageDir}/node_modules"
+    | editPlanResources (nodeResource, _)
     | editPlanVisible ( _ ++ installed )
 
 
@@ -64,6 +65,7 @@ target installNodeEnv packageDir =
     | setPlanLocalOnly True   # Remove when wake issue resolved
     | setPlanFnOutputs (\_ files "{apiLanguagesSifiveBuildDir}/{packageDir}/node_modules" `.*`) # remove when wake issue resolved
     | setPlanDirectory "{apiLanguagesSifiveBuildDir}/{packageDir}"
+    | setPlanResources (nodeResource, Nil)
     | runJob
     | getJobOutputs
 
