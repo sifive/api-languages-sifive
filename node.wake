@@ -45,7 +45,7 @@ global def nodeInstaller packageDir Unit =
 #################################################################
 # Create a command for running a node module
 #################################################################
-global def nodeCommand module args  =
+global def nodeCommand _module args  =
     "node", "-e", "module", "--", args
 
 
