@@ -41,15 +41,6 @@ global def nodeInstaller packageDir Unit =
     installNodeEnv packageDir | verifyFiles
 
 
-
-#################################################################
-# Create a command for running a node module
-#################################################################
-global def nodeCommand module args  =
-    "node", "-e", "module", "--", args
-
-
-
 ##############################################################################
 # Install a Javascript virtual environment.
 #    The binaries and packages will reside in the "build" directory.
