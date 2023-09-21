@@ -66,7 +66,7 @@ target installRubyEnv gemDir =
 
     # Install the gem bundler. Depends on gemFile, not for the gemFile but for the directory it resides in.
     def bundlerInstallOut =
-        makePlan ("gem", "install", "bundler", "-v", ">=2", "--install-dir", gem, Nil)  (gemFile, lock, Nil)
+        makePlan ("gem", "install", "bundler", "-v", "2.2.0", "--install-dir", gem, Nil)  (gemFile, lock, Nil)
         | editPlanResources ("ruby/ruby/2.5.1", _)
         | runJob
         | getJobOutputs
